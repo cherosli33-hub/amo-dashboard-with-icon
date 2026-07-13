@@ -3,66 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a2748">
-  <meta name="application-name" content="A.M.O ETD LEPEH">
-  <meta name="apple-mobile-web-app-title" content="A.M.O ETD LEPEH">
+  <meta name="theme-color" content="#087f73">
+  <meta name="description" content="Pelancar dashboard A.M.O ETD Lepeh">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="A.M.O ETD LEPEH">
   <title>A.M.O ETD LEPEH</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <link rel="icon" type="image/png" href="./favicon.png">
   <style>
-    :root { --navy:#0a2748; --teal:#27b6ad; }
-    * { box-sizing:border-box; }
-    html,body { width:100%;height:100%;margin:0;overflow:hidden;background:var(--navy);font-family:Arial,Helvetica,sans-serif; }
-    .app { position:fixed;inset:0;display:flex;flex-direction:column;background:var(--navy);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom); }
-    .loading { position:absolute;inset:0;z-index:5;display:grid;place-items:center;padding:24px;text-align:center;color:white;background:radial-gradient(circle at top,rgba(39,182,173,.34),transparent 48%),var(--navy);transition:opacity .25s ease; }
-    .loading.hidden { opacity:0;pointer-events:none; }
-    .loading-card { width:min(340px,88vw); }
-    .loading img { width:148px;height:148px;border-radius:32px;box-shadow:0 18px 50px rgba(0,0,0,.32); }
-    .loading h1 { margin:18px 0 8px;font-size:24px;letter-spacing:.4px; }
-    .loading p { margin:0 0 18px;color:#d5efeb;font-size:14px; }
-    .spinner { width:34px;height:34px;margin:0 auto;border:4px solid rgba(255,255,255,.25);border-top-color:white;border-radius:50%;animation:spin .8s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg); } }
-    iframe { width:100%;flex:1;border:0;background:white; }
-    .offline { display:none;position:absolute;inset:0;z-index:10;place-items:center;padding:28px;text-align:center;color:white;background:var(--navy); }
-    .offline.show { display:grid; }
-    .offline a { display:inline-block;margin-top:14px;padding:12px 18px;border-radius:14px;background:var(--teal);color:#032f39;text-decoration:none;font-weight:700; }
+    :root { color-scheme: dark; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100svh; display: grid; place-items: center; color: #f4fffc; background: radial-gradient(circle at 50% 10%, #24b8a5 0, #087f73 38%, #03483f 100%); padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom)); }
+    main { width: min(100%, 420px); text-align: center; }
+    .logo { width: 152px; height: 152px; border-radius: 34px; box-shadow: 0 22px 50px rgba(0, 24, 22, .38); }
+    h1 { margin: 24px 0 8px; font-size: clamp(1.8rem, 7vw, 2.35rem); letter-spacing: .035em; }
+    p { margin: 0 auto 28px; max-width: 32ch; color: #d7fff8; line-height: 1.55; }
+    a { display: inline-flex; min-height: 54px; align-items: center; justify-content: center; width: 100%; padding: 0 24px; border-radius: 16px; color: #075a50; background: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 12px 28px rgba(0, 30, 26, .25); }
+    small { display: block; margin-top: 18px; color: #bcece5; }
   </style>
 </head>
 <body>
-  <main class="app">
-    <section id="loading" class="loading" aria-live="polite">
-      <div class="loading-card">
-        <img src="./icon-512.png" alt="A.M.O ETD LEPEH">
-        <h1>A.M.O ETD LEPEH</h1>
-        <p>Membuka dashboard…</p>
-        <div class="spinner" aria-hidden="true"></div>
-      </div>
-    </section>
-    <iframe id="dashboard" title="Dashboard A.M.O ETD LEPEH" src="https://script.google.com/macros/s/AKfycbxRigIx1wS8YUEsAT6s660BTuhE8FPK8lMSZo-T3UmjVBH7qd0gHSY7f0ZvaUVIU06u/exec" allow="clipboard-read; clipboard-write" referrerpolicy="no-referrer-when-downgrade"></iframe>
-    <section id="offline" class="offline">
-      <div>
-        <h2>Tiada sambungan internet</h2>
-        <p>Dashboard memerlukan internet untuk membaca dan menyimpan data Google Sheet.</p>
-        <a href="https://script.google.com/macros/s/AKfycbxRigIx1wS8YUEsAT6s660BTuhE8FPK8lMSZo-T3UmjVBH7qd0gHSY7f0ZvaUVIU06u/exec" target="_blank" rel="noopener">Buka dashboard terus</a>
-      </div>
-    </section>
+  <main>
+    <img class="logo" src="./icon-512.png" alt="Ikon A.M.O ETD Lepeh">
+    <h1>A.M.O ETD LEPEH</h1>
+    <p>Dashboard Log Prosedur A.M.O. Tekan butang di bawah untuk membuka dashboard rasmi.</p>
+    <a id="launch" href="https://script.google.com/macros/s/AKfycbxi_k-4uYNU7nP4dfhLlwtNOPDVXfarpXsmdvGChOQsEaK9cqyUW-ZvM6NCi7S9gWQ/exec">Buka Dashboard</a>
+    <small>Memerlukan sambungan internet</small>
   </main>
   <script>
-    const DASHBOARD_URL="https://script.google.com/macros/s/AKfycbxRigIx1wS8YUEsAT6s660BTuhE8FPK8lMSZo-T3UmjVBH7qd0gHSY7f0ZvaUVIU06u/exec";
-    const frame=document.getElementById("dashboard");
-    const loading=document.getElementById("loading");
-    const offline=document.getElementById("offline");
-    frame.addEventListener("load",()=>setTimeout(()=>loading.classList.add("hidden"),450));
-    setTimeout(()=>loading.classList.add("hidden"),6000);
-    function updateConnectionState(){offline.classList.toggle("show",!navigator.onLine);}
-    window.addEventListener("online",()=>{updateConnectionState();frame.src=DASHBOARD_URL;});
-    window.addEventListener("offline",updateConnectionState);
-    updateConnectionState();
-    if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(console.error));}
+    const APP_URL = document.getElementById('launch').href;
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+    if (isInstalled && navigator.onLine) window.setTimeout(() => window.location.replace(APP_URL), 500);
   </script>
 </body>
 </html>
