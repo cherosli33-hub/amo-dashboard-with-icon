@@ -1,5 +1,5 @@
-const CACHE = 'amo-etd-lepeh-v2';
-const ASSETS = ['./', './index.html', './manifest.json?v=2', './icon-192.png?v=2', './icon-512.png?v=2', './apple-touch-icon.png?v=2', './favicon.png?v=2'];
+const CACHE = 'amo-etd-lepeh-v3';
+const ASSETS = ['./', './index.html', './manifest.json?v=3', './icon-192.png?v=3', './icon-512.png?v=3', './apple-touch-icon.png?v=3', './favicon.png?v=3'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
