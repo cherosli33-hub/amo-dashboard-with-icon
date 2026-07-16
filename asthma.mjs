@@ -91,9 +91,12 @@ function updatePatientType() {
   adultHeightInput.disabled = !isAdult;
   paediatricHeightInput.required = !isAdult;
   paediatricHeightInput.disabled = isAdult;
+  ageInput.min = isAdult ? "15" : "0";
+  ageInput.max = isAdult ? "85" : "12";
+  if (ageInput.value && !ageInput.checkValidity()) ageInput.value = "";
   ageHelp.textContent = isAdult
-    ? "Formula dewasa sah untuk umur 15–85 tahun."
-    : "Umur dan jantina direkodkan; PEFR ideal pediatrik menggunakan tinggi sahaja.";
+    ? "Formula dewasa sah untuk umur 15–85 tahun. Rujukan ini tidak meliputi umur 13–14 tahun."
+    : "Pediatrik sehingga 12 tahun; PEFR ideal menggunakan tinggi sahaja.";
   calculateAll();
 }
 
@@ -110,8 +113,6 @@ function calculateIdeal() {
       : "Pilih tinggi rujukan pediatrik 85–170 cm.";
   }
   idealValue.textContent = state.ideal ? `${state.ideal} L/min` : "— L/min";
-  beforeInput.disabled = !state.ideal;
-  afterInput.disabled = !state.ideal;
 }
 
 function calculateResults() {

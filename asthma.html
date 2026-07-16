@@ -40,7 +40,7 @@
             <span class="fieldset-label">Kategori pesakit</span>
             <div class="segmented">
               <label><input type="radio" name="patientType" value="adult" checked><span>Dewasa</span></label>
-              <label><input type="radio" name="patientType" value="paediatric"><span>Pediatrik</span></label>
+              <label><input type="radio" name="patientType" value="paediatric"><span>Pediatrik (≤12 tahun)</span></label>
             </div>
           </div>
           <div class="form-grid" style="margin-top:13px">
@@ -54,7 +54,7 @@
             </div>
             <div class="field">
               <label for="age">Umur</label>
-              <div class="unit-field"><input id="age" name="age" type="number" min="0" max="120" step="1" required><span class="unit">tahun</span></div>
+              <div class="unit-field"><input id="age" name="age" type="number" min="15" max="85" step="1" required><span class="unit">tahun</span></div>
               <small id="ageHelp">Formula dewasa sah untuk umur 15–85 tahun.</small>
             </div>
             <div class="field">
@@ -126,11 +126,11 @@
           <div class="form-grid" style="margin-top:14px">
             <div class="field">
               <label for="pefrBefore">PEFR Before</label>
-              <div class="unit-field"><input id="pefrBefore" name="pefrBefore" type="number" min="1" max="900" required disabled><span class="unit">L/min</span></div>
+              <div class="unit-field"><input id="pefrBefore" name="pefrBefore" type="number" min="1" max="900" inputmode="numeric" required><span class="unit">L/min</span></div>
             </div>
             <div class="field">
               <label for="pefrAfter">PEFR After</label>
-              <div class="unit-field"><input id="pefrAfter" name="pefrAfter" type="number" min="1" max="900" required disabled><span class="unit">L/min</span></div>
+              <div class="unit-field"><input id="pefrAfter" name="pefrAfter" type="number" min="1" max="900" inputmode="numeric" required><span class="unit">L/min</span></div>
             </div>
           </div>
           <div class="result-grid" aria-live="polite">
