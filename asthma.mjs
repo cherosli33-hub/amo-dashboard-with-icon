@@ -39,6 +39,7 @@ const syncNotice = document.querySelector("#syncNotice");
 
 let assessmentTime = new Date();
 let state = { ideal: null, beforePercentage: null, afterPercentage: null };
+let pendingRecordId = null;
 
 function localDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -223,13 +224,13 @@ function putRecords(records) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 
-function makeRecord() {
+function makeRecord(existingId = null) {
   const data = new FormData(form);
   const beforeClass = classifyPercentage(state.beforePercentage);
   const afterClass = classifyPercentage(state.afterPercentage);
   const notDone = isPefrNotDone();
   return {
-    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id: existingId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
     timestamp: new Date().toISOString(),
     date: localDateKey(assessmentTime),
     time: displayTime(assessmentTime),
@@ -271,6 +272,14 @@ async function syncRecord(record) {
     body: JSON.stringify({ action: "saveAsthmaAssessment", record })
   });
   return true;
+}
+
+function upsertLocalRecord(record) {
+  const records = getRecords();
+  const index = records.findIndex(item => item.id === record.id);
+  if (index === -1) records.push(record);
+  else records[index] = record;
+  putRecords(records);
 }
 
 function showToast(message) {
@@ -404,16 +413,28 @@ form.addEventListener("submit", async event => {
   }
   const saveButton = document.querySelector("#saveButton");
   saveButton.disabled = true;
-  const record = makeRecord();
-  const records = getRecords();
-  records.push(record);
-  putRecords(records);
+  const record = makeRecord(pendingRecordId);
+  upsertLocalRecord(record);
+  const hasEndpoint = Boolean(window.ASTHMA_CONFIG?.sheetEndpoint?.trim());
   let synced = false;
   try {
     synced = await syncRecord(record);
   } catch {
     synced = false;
   }
+  if (hasEndpoint && !synced) {
+    record.syncStatus = "pending";
+    pendingRecordId = record.id;
+    upsertLocalRecord(record);
+    showToast("Gagal menghantar ke Google Sheet. Borang dikekalkan untuk cuba semula.");
+    saveButton.disabled = false;
+    return;
+  }
+  if (synced) {
+    record.syncStatus = "submitted";
+    upsertLocalRecord(record);
+  }
+  pendingRecordId = null;
   showToast(synced ? "Rekod disimpan dan dihantar ke Google Sheet." : "Rekod disimpan pada peranti ini.");
   saveButton.disabled = false;
   resetForm();
