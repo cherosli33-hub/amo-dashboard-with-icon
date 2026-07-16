@@ -20,6 +20,7 @@ Modul Asma merangkumi:
 - PEFR Before dan After.
 - Uptriage manual oleh PPP: Tiada, Yellow Zone, atau Red Zone.
 - PEFR Not Done berserta sebab daripada borang asal: Patient Refused/Uncooperative, Severe Asthma, Unable, atau Others.
+- Nama PPP wajib diisi sebelum rekod disimpan.
 - Senarai penilaian hari ini dan statistik asas pada peranti.
 - Rujukan klinikal dewasa, pediatrik, dan interpretasi PEFR.
 

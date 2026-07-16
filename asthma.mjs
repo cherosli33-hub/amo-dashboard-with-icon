@@ -30,6 +30,7 @@ const notDoneReasons = document.querySelector("#notDoneReasons");
 const notDoneReasonInputs = [...document.querySelectorAll('input[name="notDoneReason"]')];
 const notDoneOtherField = document.querySelector("#notDoneOtherField");
 const notDoneOtherInput = document.querySelector("#notDoneOther");
+const pppNameInput = document.querySelector("#pppName");
 const uptriageCard = document.querySelector("#uptriageCard");
 const summaryCard = document.querySelector("#summaryCard");
 const summaryList = document.querySelector("#summaryList");
@@ -194,7 +195,8 @@ function renderSummary() {
     summaryList.innerHTML = [
       summaryRow("Status PEFR", "Not Done"),
       summaryRow("Sebab", detail),
-      summaryRow("Uptriage", uptriage)
+      summaryRow("Uptriage", uptriage),
+      summaryRow("Nama PPP", escapeHtml(pppNameInput.value.trim() || "Belum diisi"))
     ].join("");
     return;
   }
@@ -205,7 +207,8 @@ function renderSummary() {
     summaryRow("PEFR Ideal", `${state.ideal} L/min`),
     summaryRow("PEFR Before", `${Number(beforeInput.value)} L/min · ${state.beforePercentage.toFixed(1)}% · ${beforeClass.label}`),
     summaryRow("PEFR After", `${Number(afterInput.value)} L/min · ${state.afterPercentage.toFixed(1)}% · ${afterClass.label}`),
-    summaryRow("Uptriage", uptriage)
+    summaryRow("Uptriage", uptriage),
+    summaryRow("Nama PPP", escapeHtml(pppNameInput.value.trim() || "Belum diisi"))
   ].join("");
 }
 
@@ -254,6 +257,7 @@ function makeRecord() {
     pefrNotDone: notDone,
     notDoneReason: notDone ? selectedNotDoneReason() : "",
     notDoneOther: notDone && selectedNotDoneReason() === "Others" ? notDoneOtherInput.value.trim() : "",
+    pppName: String(data.get("pppName") || "").trim(),
     uptriage: selectedUptriage(),
     syncStatus: window.ASTHMA_CONFIG?.sheetEndpoint ? "pending" : "local"
   };
@@ -315,7 +319,7 @@ function renderRecords() {
     return `<article class="record-card">
       <div class="record-top"><strong>${escapeHtml(record.patientId)}</strong><small>${escapeHtml(record.time)}</small></div>
       ${flow}
-      <div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}${record.pefrIdeal ? ` · Ideal ${record.pefrIdeal} L/min` : ""}</span><span>Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div>
+      <div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}${record.pefrIdeal ? ` · Ideal ${record.pefrIdeal} L/min` : ""}</span><span>PPP: ${escapeHtml(record.pppName || "—")} · Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div>
     </article>`;
   }).join("");
 }
