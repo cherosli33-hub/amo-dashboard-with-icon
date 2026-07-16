@@ -22,6 +22,7 @@ Modul Asma merangkumi:
 - PEFR Not Done berserta sebab daripada borang asal: Patient Refused/Uncooperative, Severe Asthma, Unable, atau Others.
 - Nama PPP wajib diisi sebelum rekod disimpan.
 - Senarai penilaian hari ini dan statistik asas pada peranti.
+- Paparan rekod harian bertukar secara automatik apabila masuk tarikh baharu; rekod lama tidak dipadam.
 - Rujukan klinikal dewasa, pediatrik, dan interpretasi PEFR.
 
 Modul tidak membuat cadangan uptriage atau keputusan klinikal automatik.

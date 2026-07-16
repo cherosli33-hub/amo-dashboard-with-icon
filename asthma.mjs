@@ -40,6 +40,8 @@ const syncNotice = document.querySelector("#syncNotice");
 let assessmentTime = new Date();
 let state = { ideal: null, beforePercentage: null, afterPercentage: null };
 let pendingRecordId = null;
+let activeDateKey = localDateKey();
+let formDirty = false;
 
 function localDateKey(date = new Date()) {
   const year = date.getFullYear();
@@ -295,6 +297,7 @@ function resetForm() {
   document.querySelector('input[name="uptriage"][value="None"]').checked = true;
   setAssessmentTime(new Date());
   state = { ideal: null, beforePercentage: null, afterPercentage: null };
+  formDirty = false;
   updatePatientType();
   updateNotDoneMode();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -396,8 +399,31 @@ function setView(viewId) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-form.addEventListener("input", calculateAll);
+function refreshForNewDay() {
+  const today = localDateKey();
+  if (today === activeDateKey) return;
+  activeDateKey = today;
+  if (!formDirty) setAssessmentTime(new Date());
+  renderRecords();
+  renderStats();
+}
+
+function scheduleDailyRefresh() {
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 1, 0);
+  window.setTimeout(() => {
+    refreshForNewDay();
+    scheduleDailyRefresh();
+  }, nextMidnight.getTime() - now.getTime());
+}
+
+form.addEventListener("input", () => {
+  formDirty = true;
+  calculateAll();
+});
 form.addEventListener("change", event => {
+  formDirty = true;
   if (event.target.name === "patientType") updatePatientType();
   if (event.target.name === "uptriage") renderSummary();
   if (event.target.name === "pefrNotDone" || event.target.name === "notDoneReason") updateNotDoneMode();
@@ -466,4 +492,5 @@ setAssessmentTime();
 syncNotice.hidden = Boolean(window.ASTHMA_CONFIG?.sheetEndpoint?.trim());
 updatePatientType();
 updateNotDoneMode();
+scheduleDailyRefresh();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
