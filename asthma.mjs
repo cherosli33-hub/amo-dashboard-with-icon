@@ -25,6 +25,11 @@ const beforePercent = document.querySelector("#beforePercent");
 const afterPercent = document.querySelector("#afterPercent");
 const beforeCategory = document.querySelector("#beforeCategory");
 const afterCategory = document.querySelector("#afterCategory");
+const pefrNotDoneInput = document.querySelector("#pefrNotDone");
+const notDoneReasons = document.querySelector("#notDoneReasons");
+const notDoneReasonInputs = [...document.querySelectorAll('input[name="notDoneReason"]')];
+const notDoneOtherField = document.querySelector("#notDoneOtherField");
+const notDoneOtherInput = document.querySelector("#notDoneOther");
 const uptriageCard = document.querySelector("#uptriageCard");
 const summaryCard = document.querySelector("#summaryCard");
 const summaryList = document.querySelector("#summaryList");
@@ -63,6 +68,14 @@ function selectedHeight() {
   return patientType() === "adult" ? Number(adultHeightInput.value) : Number(paediatricHeightInput.value);
 }
 
+function isPefrNotDone() {
+  return pefrNotDoneInput.checked;
+}
+
+function selectedNotDoneReason() {
+  return notDoneReasonInputs.find(input => input.checked)?.value ?? "";
+}
+
 function populatePaediatricHeights() {
   Object.entries(PAEDIATRIC_PEFR).forEach(([height, pefr]) => {
     const option = document.createElement("option");
@@ -85,11 +98,12 @@ function setCategory(element, category) {
 
 function updatePatientType() {
   const isAdult = patientType() === "adult";
+  const needsPefr = !isPefrNotDone();
   adultHeightField.hidden = !isAdult;
   paediatricHeightField.hidden = isAdult;
-  adultHeightInput.required = isAdult;
+  adultHeightInput.required = isAdult && needsPefr;
   adultHeightInput.disabled = !isAdult;
-  paediatricHeightInput.required = !isAdult;
+  paediatricHeightInput.required = !isAdult && needsPefr;
   paediatricHeightInput.disabled = isAdult;
   ageInput.min = isAdult ? "15" : "0";
   ageInput.max = isAdult ? "85" : "14";
@@ -97,6 +111,27 @@ function updatePatientType() {
   ageHelp.textContent = isAdult
     ? "Formula dewasa sah untuk umur 15–85 tahun. Rujukan ini tidak meliputi umur 13–14 tahun."
     : "Pediatrik 0–14 tahun; PEFR ideal menggunakan tinggi sahaja.";
+  calculateAll();
+}
+
+function updateNotDoneMode() {
+  const notDone = isPefrNotDone();
+  notDoneReasons.hidden = !notDone;
+  notDoneReasonInputs.forEach(input => { input.required = notDone; });
+  const isOther = notDone && selectedNotDoneReason() === "Others";
+  notDoneOtherField.hidden = !isOther;
+  notDoneOtherInput.required = isOther;
+  beforeInput.required = !notDone;
+  afterInput.required = !notDone;
+  beforeInput.disabled = notDone;
+  afterInput.disabled = notDone;
+  if (notDone) {
+    beforeInput.value = "";
+    afterInput.value = "";
+  }
+  const isAdult = patientType() === "adult";
+  adultHeightInput.required = isAdult && !notDone;
+  paediatricHeightInput.required = !isAdult && !notDone;
   calculateAll();
 }
 
@@ -124,8 +159,14 @@ function calculateResults() {
   afterPercent.textContent = state.afterPercentage === null ? "—%" : `${state.afterPercentage.toFixed(1)}%`;
   setCategory(beforeCategory, beforeClass);
   setCategory(afterCategory, afterClass);
-  uptriageCard.hidden = state.afterPercentage === null;
-  summaryCard.hidden = state.beforePercentage === null || state.afterPercentage === null;
+  if (isPefrNotDone()) {
+    beforePercent.textContent = "Not Done";
+    afterPercent.textContent = "Not Done";
+    beforeCategory.textContent = "Tiada bacaan";
+    afterCategory.textContent = "Tiada bacaan";
+  }
+  uptriageCard.hidden = state.afterPercentage === null && !isPefrNotDone();
+  summaryCard.hidden = !isPefrNotDone() && (state.beforePercentage === null || state.afterPercentage === null);
   renderSummary();
 }
 
@@ -144,6 +185,19 @@ function selectedUptriage() {
 
 function renderSummary() {
   if (summaryCard.hidden) return;
+  if (isPefrNotDone()) {
+    const reason = selectedNotDoneReason() || "Belum dipilih";
+    const detail = reason === "Others" && notDoneOtherInput.value.trim()
+      ? `Others — ${escapeHtml(notDoneOtherInput.value.trim())}`
+      : escapeHtml(reason);
+    const uptriage = selectedUptriage() === "None" ? "Tiada" : selectedUptriage();
+    summaryList.innerHTML = [
+      summaryRow("Status PEFR", "Not Done"),
+      summaryRow("Sebab", detail),
+      summaryRow("Uptriage", uptriage)
+    ].join("");
+    return;
+  }
   const beforeClass = classifyPercentage(state.beforePercentage);
   const afterClass = classifyPercentage(state.afterPercentage);
   const uptriage = selectedUptriage() === "None" ? "Tiada" : selectedUptriage();
@@ -172,6 +226,7 @@ function makeRecord() {
   const data = new FormData(form);
   const beforeClass = classifyPercentage(state.beforePercentage);
   const afterClass = classifyPercentage(state.afterPercentage);
+  const notDone = isPefrNotDone();
   return {
     id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     timestamp: new Date().toISOString(),
@@ -182,7 +237,7 @@ function makeRecord() {
     patientId: String(data.get("patientId") || "").trim(),
     age: Number(data.get("age")),
     sex: data.get("sex"),
-    height: selectedHeight(),
+    height: selectedHeight() || null,
     bpSys: data.get("bpSys") ? Number(data.get("bpSys")) : null,
     bpDia: data.get("bpDia") ? Number(data.get("bpDia")) : null,
     hr: data.get("hr") ? Number(data.get("hr")) : null,
@@ -190,12 +245,15 @@ function makeRecord() {
     temperature: data.get("temperature") ? Number(data.get("temperature")) : null,
     spo2: data.get("spo2") ? Number(data.get("spo2")) : null,
     pefrIdeal: state.ideal,
-    pefrBefore: Number(data.get("pefrBefore")),
-    percentageBefore: state.beforePercentage,
-    categoryBefore: beforeClass.label,
-    pefrAfter: Number(data.get("pefrAfter")),
-    percentageAfter: state.afterPercentage,
-    categoryAfter: afterClass.label,
+    pefrBefore: notDone ? null : Number(data.get("pefrBefore")),
+    percentageBefore: notDone ? null : state.beforePercentage,
+    categoryBefore: notDone ? "Not Done" : beforeClass.label,
+    pefrAfter: notDone ? null : Number(data.get("pefrAfter")),
+    percentageAfter: notDone ? null : state.afterPercentage,
+    categoryAfter: notDone ? "Not Done" : afterClass.label,
+    pefrNotDone: notDone,
+    notDoneReason: notDone ? selectedNotDoneReason() : "",
+    notDoneOther: notDone && selectedNotDoneReason() === "Others" ? notDoneOtherInput.value.trim() : "",
     uptriage: selectedUptriage(),
     syncStatus: window.ASTHMA_CONFIG?.sheetEndpoint ? "pending" : "local"
   };
@@ -227,10 +285,14 @@ function resetForm() {
   setAssessmentTime(new Date());
   state = { ideal: null, beforePercentage: null, afterPercentage: null };
   updatePatientType();
+  updateNotDoneMode();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function categoryBadge(category, percentage) {
+  if (category === "Not Done" || !Number.isFinite(Number(percentage))) {
+    return '<span class="category-badge category-empty">PEFR Not Done</span>';
+  }
   const klass = category.toLowerCase();
   return `<span class="category-badge category-${klass}">${percentage.toFixed(1)}% · ${category}</span>`;
 }
@@ -246,16 +308,16 @@ function renderRecords() {
     list.innerHTML = '<div class="empty-state">Tiada rekod penilaian untuk dipaparkan.</div>';
     return;
   }
-  list.innerHTML = records.map(record => `
-    <article class="record-card">
+  list.innerHTML = records.map(record => {
+    const flow = record.pefrNotDone
+      ? `<div class="record-flow"><div><b>PEFR Not Done</b>${categoryBadge("Not Done", null)}</div><span class="arrow">·</span><div><b>Sebab</b><small>${escapeHtml(record.notDoneReason || "Tidak dinyatakan")}${record.notDoneOther ? ` — ${escapeHtml(record.notDoneOther)}` : ""}</small></div></div>`
+      : `<div class="record-flow"><div><b>Before · ${record.pefrBefore} L/min</b>${categoryBadge(record.categoryBefore, record.percentageBefore)}</div><span class="arrow">→</span><div><b>After · ${record.pefrAfter} L/min</b>${categoryBadge(record.categoryAfter, record.percentageAfter)}</div></div>`;
+    return `<article class="record-card">
       <div class="record-top"><strong>${escapeHtml(record.patientId)}</strong><small>${escapeHtml(record.time)}</small></div>
-      <div class="record-flow">
-        <div><b>Before · ${record.pefrBefore} L/min</b>${categoryBadge(record.categoryBefore, record.percentageBefore)}</div>
-        <span class="arrow">→</span>
-        <div><b>After · ${record.pefrAfter} L/min</b>${categoryBadge(record.categoryAfter, record.percentageAfter)}</div>
-      </div>
-      <div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"} · Ideal ${record.pefrIdeal} L/min</span><span>Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div>
-    </article>`).join("");
+      ${flow}
+      <div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}${record.pefrIdeal ? ` · Ideal ${record.pefrIdeal} L/min` : ""}</span><span>Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div>
+    </article>`;
+  }).join("");
 }
 
 function escapeHtml(value) {
@@ -302,12 +364,14 @@ function renderStats() {
   const adults = records.filter(record => record.patientType === "adult").length;
   const yellow = records.filter(record => record.uptriage === "Yellow Zone").length;
   const red = records.filter(record => record.uptriage === "Red Zone").length;
+  const notDone = records.filter(record => record.pefrNotDone).length;
   document.querySelector("#statsGrid").innerHTML = [
     ["Jumlah penilaian", records.length],
     ["Dewasa", adults],
     ["Pediatrik", records.length - adults],
     ["Uptriage Yellow", yellow],
-    ["Uptriage Red", red]
+    ["Uptriage Red", red],
+    ["PEFR Not Done", notDone]
   ].map(([label, value]) => `<div class="stat-card"><small>${label}</small><strong>${value}</strong></div>`).join("");
   renderBars(document.querySelector("#beforeBars"), records, "categoryBefore");
   renderBars(document.querySelector("#afterBars"), records, "categoryAfter");
@@ -325,10 +389,14 @@ form.addEventListener("input", calculateAll);
 form.addEventListener("change", event => {
   if (event.target.name === "patientType") updatePatientType();
   if (event.target.name === "uptriage") renderSummary();
+  if (event.target.name === "pefrNotDone" || event.target.name === "notDoneReason") updateNotDoneMode();
 });
 form.addEventListener("submit", async event => {
   event.preventDefault();
-  if (!form.reportValidity() || !state.ideal || state.beforePercentage === null || state.afterPercentage === null) {
+  const validAssessment = isPefrNotDone()
+    ? Boolean(selectedNotDoneReason())
+    : Boolean(state.ideal && state.beforePercentage !== null && state.afterPercentage !== null);
+  if (!form.reportValidity() || !validAssessment) {
     showToast("Lengkapkan semua maklumat wajib dan bacaan PEFR.");
     return;
   }
@@ -374,4 +442,5 @@ populatePaediatricHeights();
 setAssessmentTime();
 syncNotice.hidden = Boolean(window.ASTHMA_CONFIG?.sheetEndpoint?.trim());
 updatePatientType();
+updateNotDoneMode();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");

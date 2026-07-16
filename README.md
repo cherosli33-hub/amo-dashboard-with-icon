@@ -19,6 +19,7 @@ Modul Asma merangkumi:
 - Kategori Mild `>80%`, Moderate `60–80%`, dan Severe `<60%`.
 - PEFR Before dan After.
 - Uptriage manual oleh PPP: Tiada, Yellow Zone, atau Red Zone.
+- PEFR Not Done berserta sebab daripada borang asal: Patient Refused/Uncooperative, Severe Asthma, Unable, atau Others.
 - Senarai penilaian hari ini dan statistik asas pada peranti.
 - Rujukan klinikal dewasa, pediatrik, dan interpretasi PEFR.
 

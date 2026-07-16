@@ -147,8 +147,29 @@
           </div>
         </section>
 
+        <section class="card">
+          <h2><span class="step">4</span>PEFR Not Done <small>(jika berkaitan)</small></h2>
+          <label class="checkbox-row">
+            <input id="pefrNotDone" name="pefrNotDone" type="checkbox">
+            <span><strong>PEFR tidak dapat dilakukan</strong><small>Tandakan jika tiada bacaan PEFR Before/After.</small></span>
+          </label>
+          <div id="notDoneReasons" hidden>
+            <p class="fieldset-label" style="margin:16px 0 9px">Sebab PEFR tidak dilakukan</p>
+            <div class="option-list">
+              <label><input type="radio" name="notDoneReason" value="Patient Refused / Uncooperative"><span><b>1</b> Patient Refused / Uncooperative</span></label>
+              <label><input type="radio" name="notDoneReason" value="Severe Asthma"><span><b>2</b> Severe Asthma</span></label>
+              <label><input type="radio" name="notDoneReason" value="Unable (mental retard / post-tracheostomy)"><span><b>3</b> Unable <small>(mental retard / post-tracheostomy)</small></span></label>
+              <label><input type="radio" name="notDoneReason" value="Others"><span><b>4</b> Others (Specify)</span></label>
+            </div>
+            <div id="notDoneOtherField" class="field" style="margin-top:10px" hidden>
+              <label for="notDoneOther">Nyatakan sebab lain</label>
+              <input id="notDoneOther" name="notDoneOther" maxlength="160">
+            </div>
+          </div>
+        </section>
+
         <section id="uptriageCard" class="card uptriage-card" hidden>
-          <h2><span class="step">4</span>Uptriage oleh PPP</h2>
+          <h2><span class="step">5</span>Uptriage oleh PPP</h2>
           <p style="margin:-5px 0 14px;color:var(--muted);font-size:.83rem">Pilih berdasarkan penilaian klinikal. Sistem tidak mencadangkan zon.</p>
           <div class="segmented three">
             <label><input type="radio" name="uptriage" value="None" checked><span>Tiada</span></label>
@@ -158,7 +179,7 @@
         </section>
 
         <section id="summaryCard" class="card summary-card" hidden>
-          <h2><span class="step">5</span>Ringkasan sebelum simpan</h2>
+          <h2><span class="step">6</span>Ringkasan sebelum simpan</h2>
           <dl id="summaryList" class="summary-list"></dl>
           <div class="actions">
             <button id="resetButton" class="btn btn-secondary" type="button">Kosongkan</button>
