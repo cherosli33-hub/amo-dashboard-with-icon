@@ -195,8 +195,7 @@ function renderSummary() {
     summaryList.innerHTML = [
       summaryRow("Status PEFR", "Not Done"),
       summaryRow("Sebab", detail),
-      summaryRow("Uptriage", uptriage),
-      summaryRow("Nama PPP", escapeHtml(pppNameInput.value.trim() || "Belum diisi"))
+      summaryRow("Uptriage", uptriage)
     ].join("");
     return;
   }
@@ -207,8 +206,7 @@ function renderSummary() {
     summaryRow("PEFR Ideal", `${state.ideal} L/min`),
     summaryRow("PEFR Before", `${Number(beforeInput.value)} L/min · ${state.beforePercentage.toFixed(1)}% · ${beforeClass.label}`),
     summaryRow("PEFR After", `${Number(afterInput.value)} L/min · ${state.afterPercentage.toFixed(1)}% · ${afterClass.label}`),
-    summaryRow("Uptriage", uptriage),
-    summaryRow("Nama PPP", escapeHtml(pppNameInput.value.trim() || "Belum diisi"))
+    summaryRow("Uptriage", uptriage)
   ].join("");
 }
 
