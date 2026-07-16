@@ -1,12 +1,6 @@
-import {
-  PAEDIATRIC_PEFR,
-  predictedAdultPef,
-  predictedPaediatricPef,
-  pefrPercentage,
-  classifyPercentage
-} from "./pefr.mjs";
+import { PAEDIATRIC_PEFR, predictedAdultPef, predictedPaediatricPef, pefrPercentage, classifyPercentage } from "./pefr.mjs";
 
-const STORAGE_KEY = "amo-etd-asthma-assessments-v1";
+const PENDING_KEY = "amo-etd-asthma-pending-v2";
 const form = document.querySelector("#assessmentForm");
 const patientTypeInputs = [...document.querySelectorAll('input[name="patientType"]')];
 const uptriageInputs = [...document.querySelectorAll('input[name="uptriage"]')];
@@ -30,7 +24,6 @@ const notDoneReasons = document.querySelector("#notDoneReasons");
 const notDoneReasonInputs = [...document.querySelectorAll('input[name="notDoneReason"]')];
 const notDoneOtherField = document.querySelector("#notDoneOtherField");
 const notDoneOtherInput = document.querySelector("#notDoneOther");
-const pppNameInput = document.querySelector("#pppName");
 const uptriageCard = document.querySelector("#uptriageCard");
 const summaryCard = document.querySelector("#summaryCard");
 const summaryList = document.querySelector("#summaryList");
@@ -39,46 +32,26 @@ const syncNotice = document.querySelector("#syncNotice");
 
 let assessmentTime = new Date();
 let state = { ideal: null, beforePercentage: null, afterPercentage: null };
-let pendingRecordId = null;
-let activeDateKey = localDateKey();
+let sharedRecords = [];
 let formDirty = false;
 
+function endpoint() { return window.ASTHMA_CONFIG?.sheetEndpoint?.trim() || ""; }
 function localDateKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-
-function displayDate(date = new Date()) {
-  return new Intl.DateTimeFormat("ms-MY", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
-}
-
-function displayTime(date = new Date()) {
-  return new Intl.DateTimeFormat("ms-MY", { hour: "2-digit", minute: "2-digit" }).format(date);
-}
-
+function displayDate(date = new Date()) { return new Intl.DateTimeFormat("ms-MY", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date); }
+function displayTime(date = new Date()) { return new Intl.DateTimeFormat("ms-MY", { hour: "2-digit", minute: "2-digit" }).format(date); }
 function setAssessmentTime(date = new Date()) {
   assessmentTime = date;
   document.querySelector("#displayDate").value = displayDate(date);
   document.querySelector("#displayTime").value = displayTime(date);
 }
-
-function patientType() {
-  return patientTypeInputs.find(input => input.checked)?.value ?? "adult";
-}
-
-function selectedHeight() {
-  return patientType() === "adult" ? Number(adultHeightInput.value) : Number(paediatricHeightInput.value);
-}
-
-function isPefrNotDone() {
-  return pefrNotDoneInput.checked;
-}
-
-function selectedNotDoneReason() {
-  return notDoneReasonInputs.find(input => input.checked)?.value ?? "";
-}
+function patientType() { return patientTypeInputs.find(input => input.checked)?.value ?? "adult"; }
+function selectedHeight() { return patientType() === "adult" ? Number(adultHeightInput.value) : Number(paediatricHeightInput.value); }
+function isPefrNotDone() { return pefrNotDoneInput.checked; }
+function selectedNotDoneReason() { return notDoneReasonInputs.find(input => input.checked)?.value ?? ""; }
+function selectedUptriage() { return uptriageInputs.find(input => input.checked)?.value ?? "None"; }
+function escapeHtml(value) { return String(value ?? "").replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[c]); }
 
 function populatePaediatricHeights() {
   Object.entries(PAEDIATRIC_PEFR).forEach(([height, pefr]) => {
@@ -88,7 +61,6 @@ function populatePaediatricHeights() {
     paediatricHeightInput.append(option);
   });
 }
-
 function setCategory(element, category) {
   element.className = "category-badge";
   if (!category) {
@@ -99,140 +71,93 @@ function setCategory(element, category) {
   element.classList.add(`category-${category.key}`);
   element.textContent = `${category.label} (${category.range})`;
 }
-
 function updatePatientType() {
-  const isAdult = patientType() === "adult";
+  const adult = patientType() === "adult";
   const needsPefr = !isPefrNotDone();
-  adultHeightField.hidden = !isAdult;
-  paediatricHeightField.hidden = isAdult;
-  adultHeightInput.required = isAdult && needsPefr;
-  adultHeightInput.disabled = !isAdult;
-  paediatricHeightInput.required = !isAdult && needsPefr;
-  paediatricHeightInput.disabled = isAdult;
-  ageInput.min = isAdult ? "15" : "0";
-  ageInput.max = isAdult ? "85" : "14";
-  if (ageInput.value && !ageInput.checkValidity()) ageInput.value = "";
-  ageHelp.textContent = isAdult
-    ? "Formula dewasa sah untuk umur 15–85 tahun. Rujukan ini tidak meliputi umur 13–14 tahun."
-    : "Pediatrik 0–14 tahun; PEFR ideal menggunakan tinggi sahaja.";
+  adultHeightField.hidden = !adult;
+  paediatricHeightField.hidden = adult;
+  adultHeightInput.required = adult && needsPefr;
+  adultHeightInput.disabled = !adult;
+  paediatricHeightInput.required = !adult && needsPefr;
+  paediatricHeightInput.disabled = adult;
+  ageInput.min = adult ? "15" : "0";
+  ageInput.max = adult ? "85" : "14";
+  ageHelp.textContent = adult ? "Formula dewasa sah untuk umur 15–85 tahun." : "Pediatrik 0–14 tahun; PEFR ideal menggunakan tinggi sahaja.";
   calculateAll();
 }
-
 function updateNotDoneMode() {
   const notDone = isPefrNotDone();
   notDoneReasons.hidden = !notDone;
   notDoneReasonInputs.forEach(input => { input.required = notDone; });
-  const isOther = notDone && selectedNotDoneReason() === "Others";
-  notDoneOtherField.hidden = !isOther;
-  notDoneOtherInput.required = isOther;
+  const other = notDone && selectedNotDoneReason() === "Others";
+  notDoneOtherField.hidden = !other;
+  notDoneOtherInput.required = other;
   beforeInput.required = !notDone;
   afterInput.required = !notDone;
   beforeInput.disabled = notDone;
   afterInput.disabled = notDone;
-  if (notDone) {
-    beforeInput.value = "";
-    afterInput.value = "";
-  }
-  const isAdult = patientType() === "adult";
-  adultHeightInput.required = isAdult && !notDone;
-  paediatricHeightInput.required = !isAdult && !notDone;
-  calculateAll();
+  if (notDone) { beforeInput.value = ""; afterInput.value = ""; }
+  updatePatientType();
 }
-
 function calculateIdeal() {
   if (patientType() === "adult") {
     state.ideal = predictedAdultPef({ age: ageInput.value, sex: sexInput.value, heightCm: adultHeightInput.value });
-    idealMethod.textContent = state.ideal
-      ? "Nunn–Gregg (umur, jantina, tinggi), ditukar kepada skala EU/EN13826."
-      : "Dewasa memerlukan umur 15–85 tahun, jantina dan tinggi.";
+    idealMethod.textContent = state.ideal ? "Nunn–Gregg, ditukar kepada skala EU/EN13826." : "Lengkapkan umur, jantina dan tinggi.";
   } else {
     state.ideal = predictedPaediatricPef(paediatricHeightInput.value);
-    idealMethod.textContent = state.ideal
-      ? "Nilai tepat jadual pediatrik EU/EN13826 berdasarkan tinggi."
-      : "Pilih tinggi rujukan pediatrik 85–170 cm.";
+    idealMethod.textContent = state.ideal ? "Nilai jadual pediatrik berdasarkan tinggi." : "Pilih tinggi rujukan pediatrik.";
   }
   idealValue.textContent = state.ideal ? `${state.ideal} L/min` : "— L/min";
 }
-
 function calculateResults() {
   state.beforePercentage = pefrPercentage(beforeInput.value, state.ideal);
   state.afterPercentage = pefrPercentage(afterInput.value, state.ideal);
-  const beforeClass = classifyPercentage(state.beforePercentage);
-  const afterClass = classifyPercentage(state.afterPercentage);
+  setCategory(beforeCategory, classifyPercentage(state.beforePercentage));
+  setCategory(afterCategory, classifyPercentage(state.afterPercentage));
   beforePercent.textContent = state.beforePercentage === null ? "—%" : `${state.beforePercentage.toFixed(1)}%`;
   afterPercent.textContent = state.afterPercentage === null ? "—%" : `${state.afterPercentage.toFixed(1)}%`;
-  setCategory(beforeCategory, beforeClass);
-  setCategory(afterCategory, afterClass);
   if (isPefrNotDone()) {
     beforePercent.textContent = "Not Done";
     afterPercent.textContent = "Not Done";
-    beforeCategory.textContent = "Tiada bacaan";
-    afterCategory.textContent = "Tiada bacaan";
+    beforeCategory.className = afterCategory.className = "category-badge category-empty";
+    beforeCategory.textContent = afterCategory.textContent = "Tiada bacaan";
   }
   uptriageCard.hidden = state.afterPercentage === null && !isPefrNotDone();
   summaryCard.hidden = !isPefrNotDone() && (state.beforePercentage === null || state.afterPercentage === null);
   renderSummary();
 }
-
-function calculateAll() {
-  calculateIdeal();
-  calculateResults();
-}
-
-function summaryRow(label, value) {
-  return `<div class="summary-row"><dt>${label}</dt><dd>${value}</dd></div>`;
-}
-
-function selectedUptriage() {
-  return uptriageInputs.find(input => input.checked)?.value ?? "None";
-}
-
+function calculateAll() { calculateIdeal(); calculateResults(); }
+function summaryRow(label, value) { return `<div class="summary-row"><dt>${label}</dt><dd>${value}</dd></div>`; }
 function renderSummary() {
   if (summaryCard.hidden) return;
+  const uptriage = selectedUptriage() === "None" ? "Tiada" : selectedUptriage();
   if (isPefrNotDone()) {
     const reason = selectedNotDoneReason() || "Belum dipilih";
-    const detail = reason === "Others" && notDoneOtherInput.value.trim()
-      ? `Others — ${escapeHtml(notDoneOtherInput.value.trim())}`
-      : escapeHtml(reason);
-    const uptriage = selectedUptriage() === "None" ? "Tiada" : selectedUptriage();
-    summaryList.innerHTML = [
-      summaryRow("Status PEFR", "Not Done"),
-      summaryRow("Sebab", detail),
-      summaryRow("Uptriage", uptriage)
-    ].join("");
+    const detail = reason === "Others" && notDoneOtherInput.value.trim() ? `Others — ${escapeHtml(notDoneOtherInput.value.trim())}` : escapeHtml(reason);
+    summaryList.innerHTML = [summaryRow("Status PEFR", "Not Done"), summaryRow("Sebab", detail), summaryRow("Uptriage", uptriage)].join("");
     return;
   }
-  const beforeClass = classifyPercentage(state.beforePercentage);
-  const afterClass = classifyPercentage(state.afterPercentage);
-  const uptriage = selectedUptriage() === "None" ? "Tiada" : selectedUptriage();
   summaryList.innerHTML = [
     summaryRow("PEFR Ideal", `${state.ideal} L/min`),
-    summaryRow("PEFR Before", `${Number(beforeInput.value)} L/min · ${state.beforePercentage.toFixed(1)}% · ${beforeClass.label}`),
-    summaryRow("PEFR After", `${Number(afterInput.value)} L/min · ${state.afterPercentage.toFixed(1)}% · ${afterClass.label}`),
+    summaryRow("PEFR Before", `${Number(beforeInput.value)} L/min · ${state.beforePercentage.toFixed(1)}% · ${classifyPercentage(state.beforePercentage).label}`),
+    summaryRow("PEFR After", `${Number(afterInput.value)} L/min · ${state.afterPercentage.toFixed(1)}% · ${classifyPercentage(state.afterPercentage).label}`),
     summaryRow("Uptriage", uptriage)
   ].join("");
 }
 
-function getRecords() {
-  try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
+function getPending() {
+  try { const value = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]"); return Array.isArray(value) ? value : []; }
+  catch { return []; }
 }
+function setPending(records) { localStorage.setItem(PENDING_KEY, JSON.stringify(records)); }
+function addPending(record) { const records = getPending().filter(item => item.id !== record.id); records.push(record); setPending(records); }
+function removePending(id) { setPending(getPending().filter(item => item.id !== id)); }
 
-function putRecords(records) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-}
-
-function makeRecord(existingId = null) {
+function makeRecord() {
   const data = new FormData(form);
-  const beforeClass = classifyPercentage(state.beforePercentage);
-  const afterClass = classifyPercentage(state.afterPercentage);
   const notDone = isPefrNotDone();
   return {
-    id: existingId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     timestamp: new Date().toISOString(),
     date: localDateKey(assessmentTime),
     time: displayTime(assessmentTime),
@@ -242,7 +167,9 @@ function makeRecord(existingId = null) {
     age: Number(data.get("age")),
     sex: data.get("sex"),
     height: selectedHeight() || null,
-    bp: String(data.get("bp") || "").replace(/\s+/g, ""),
+    bpSys: data.get("bpSys") ? Number(data.get("bpSys")) : null,
+    bpDia: data.get("bpDia") ? Number(data.get("bpDia")) : null,
+    bp: data.get("bpSys") && data.get("bpDia") ? `${data.get("bpSys")}/${data.get("bpDia")}` : "",
     hr: data.get("hr") ? Number(data.get("hr")) : null,
     rr: data.get("rr") ? Number(data.get("rr")) : null,
     temperature: data.get("temperature") ? Number(data.get("temperature")) : null,
@@ -250,46 +177,80 @@ function makeRecord(existingId = null) {
     pefrIdeal: state.ideal,
     pefrBefore: notDone ? null : Number(data.get("pefrBefore")),
     percentageBefore: notDone ? null : state.beforePercentage,
-    categoryBefore: notDone ? "Not Done" : beforeClass.label,
+    categoryBefore: notDone ? "Not Done" : classifyPercentage(state.beforePercentage).label,
     pefrAfter: notDone ? null : Number(data.get("pefrAfter")),
     percentageAfter: notDone ? null : state.afterPercentage,
-    categoryAfter: notDone ? "Not Done" : afterClass.label,
+    categoryAfter: notDone ? "Not Done" : classifyPercentage(state.afterPercentage).label,
     pefrNotDone: notDone,
     notDoneReason: notDone ? selectedNotDoneReason() : "",
     notDoneOther: notDone && selectedNotDoneReason() === "Others" ? notDoneOtherInput.value.trim() : "",
     pppName: String(data.get("pppName") || "").trim(),
-    uptriage: selectedUptriage(),
-    syncStatus: window.ASTHMA_CONFIG?.sheetEndpoint ? "pending" : "local"
+    uptriage: selectedUptriage()
   };
 }
 
-async function syncRecord(record) {
-  const endpoint = window.ASTHMA_CONFIG?.sheetEndpoint?.trim();
-  if (!endpoint) return false;
-  await fetch(endpoint, {
+async function postRecord(record) {
+  if (!endpoint()) throw new Error("Google Sheet belum disambungkan.");
+  await fetch(endpoint(), {
     method: "POST",
     mode: "no-cors",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ action: "saveAsthmaAssessment", record })
   });
-  return true;
 }
-
-function upsertLocalRecord(record) {
-  const records = getRecords();
-  const index = records.findIndex(item => item.id === record.id);
-  if (index === -1) records.push(record);
-  else records[index] = record;
-  putRecords(records);
+function jsonp(action, params = {}) {
+  return new Promise((resolve, reject) => {
+    if (!endpoint()) { reject(new Error("Google Sheet belum disambungkan.")); return; }
+    const callback = `__asthma_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement("script");
+    const timeout = window.setTimeout(() => cleanup(new Error("Masa sambungan tamat.")), 12000);
+    function cleanup(error, data) {
+      window.clearTimeout(timeout);
+      delete window[callback];
+      script.remove();
+      error ? reject(error) : resolve(data);
+    }
+    window[callback] = data => cleanup(null, data);
+    const url = new URL(endpoint());
+    url.searchParams.set("action", action);
+    url.searchParams.set("callback", callback);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+    script.onerror = () => cleanup(new Error("Gagal membaca Google Sheet."));
+    script.src = url.toString();
+    document.head.append(script);
+  });
+}
+async function loadSharedRecords(showMessage = false) {
+  try {
+    const response = await jsonp("listAsthmaAssessments");
+    if (!response?.ok) throw new Error(response?.error || "Gagal membaca rekod.");
+    sharedRecords = Array.isArray(response.records) ? response.records : [];
+    syncNotice.hidden = true;
+    renderRecords();
+    renderStats();
+    if (showMessage) showToast("Rekod Google Sheet telah dimuat semula.");
+  } catch (error) {
+    sharedRecords = getPending();
+    syncNotice.hidden = false;
+    syncNotice.textContent = `${error.message} Paparan sementara menggunakan rekod belum disegerakkan pada peranti ini.`;
+    renderRecords();
+    renderStats();
+  }
+}
+async function retryPending() {
+  if (!endpoint() || !navigator.onLine) return;
+  for (const record of getPending()) {
+    try { await postRecord(record); removePending(record.id); }
+    catch { break; }
+  }
 }
 
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add("is-visible");
   window.clearTimeout(showToast.timer);
-  showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 3200);
+  showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 3500);
 }
-
 function resetForm() {
   form.reset();
   document.querySelector('input[name="patientType"][value="adult"]').checked = true;
@@ -297,130 +258,66 @@ function resetForm() {
   setAssessmentTime(new Date());
   state = { ideal: null, beforePercentage: null, afterPercentage: null };
   formDirty = false;
-  updatePatientType();
   updateNotDoneMode();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-
 function categoryBadge(category, percentage) {
-  if (category === "Not Done" || !Number.isFinite(Number(percentage))) {
-    return '<span class="category-badge category-empty">PEFR Not Done</span>';
-  }
-  const klass = category.toLowerCase();
-  return `<span class="category-badge category-${klass}">${percentage.toFixed(1)}% · ${category}</span>`;
+  if (category === "Not Done" || !Number.isFinite(Number(percentage))) return '<span class="category-badge category-empty">PEFR Not Done</span>';
+  return `<span class="category-badge category-${String(category).toLowerCase()}">${Number(percentage).toFixed(1)}% · ${escapeHtml(category)}</span>`;
 }
-
+function currentRecords() {
+  const merged = [...sharedRecords];
+  getPending().forEach(record => { if (!merged.some(item => item.id === record.id)) merged.push(record); });
+  return merged;
+}
 function renderRecords() {
   const list = document.querySelector("#recordList");
   const query = document.querySelector("#recordSearch").value.trim().toLowerCase();
-  const records = getRecords()
-    .filter(record => record.date === localDateKey())
-    .filter(record => !query || record.patientId.toLowerCase().includes(query))
-    .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  if (!records.length) {
-    list.innerHTML = '<div class="empty-state">Tiada rekod penilaian untuk dipaparkan.</div>';
-    return;
-  }
+  const records = currentRecords().filter(record => record.date === localDateKey()).filter(record => !query || String(record.patientId).toLowerCase().includes(query)).sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+  if (!records.length) { list.innerHTML = '<div class="empty-state">Tiada rekod penilaian untuk dipaparkan.</div>'; return; }
   list.innerHTML = records.map(record => {
     const flow = record.pefrNotDone
-      ? `<div class="record-flow"><div><b>PEFR Not Done</b>${categoryBadge("Not Done", null)}</div><span class="arrow">·</span><div><b>Sebab</b><small>${escapeHtml(record.notDoneReason || "Tidak dinyatakan")}${record.notDoneOther ? ` — ${escapeHtml(record.notDoneOther)}` : ""}</small></div></div>`
+      ? `<div class="record-flow"><div><b>PEFR Not Done</b>${categoryBadge("Not Done", null)}</div><span class="arrow">·</span><div><b>Sebab</b><small>${escapeHtml(record.notDoneReason || "Tidak dinyatakan")}</small></div></div>`
       : `<div class="record-flow"><div><b>Before · ${record.pefrBefore} L/min</b>${categoryBadge(record.categoryBefore, record.percentageBefore)}</div><span class="arrow">→</span><div><b>After · ${record.pefrAfter} L/min</b>${categoryBadge(record.categoryAfter, record.percentageAfter)}</div></div>`;
-    return `<article class="record-card">
-      <div class="record-top"><strong>${escapeHtml(record.patientId)}</strong><small>${escapeHtml(record.time)}</small></div>
-      ${flow}
-      <div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}${record.pefrIdeal ? ` · Ideal ${record.pefrIdeal} L/min` : ""}</span><span>PPP: ${escapeHtml(record.pppName || "—")} · Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div>
-    </article>`;
+    return `<article class="record-card"><div class="record-top"><strong>${escapeHtml(record.patientId)}</strong><small>${escapeHtml(record.time)}</small></div>${flow}<div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}${record.pefrIdeal ? ` · Ideal ${record.pefrIdeal} L/min` : ""}</span><span>PPP: ${escapeHtml(record.pppName || "—")} · Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div></article>`;
   }).join("");
 }
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
-}
-
-function startOfWeek(date) {
-  const result = new Date(date);
-  const day = (result.getDay() + 6) % 7;
-  result.setHours(0, 0, 0, 0);
-  result.setDate(result.getDate() - day);
-  return result;
-}
-
+function startOfWeek(date) { const result = new Date(date); const day = (result.getDay() + 6) % 7; result.setHours(0, 0, 0, 0); result.setDate(result.getDate() - day); return result; }
 function recordsForRange(range) {
   const now = new Date();
-  const today = localDateKey(now);
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  return getRecords().filter(record => {
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  return currentRecords().filter(record => {
     if (range === "all") return true;
-    if (range === "today") return record.date === today;
+    if (range === "today") return record.date === localDateKey(now);
     if (range === "yesterday") return record.date === localDateKey(yesterday);
-    const recordDate = new Date(`${record.date}T00:00:00`);
-    if (range === "week") return recordDate >= startOfWeek(now);
-    return recordDate.getMonth() === now.getMonth() && recordDate.getFullYear() === now.getFullYear();
+    const date = new Date(`${record.date}T00:00:00`);
+    if (range === "week") return date >= startOfWeek(now);
+    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
   });
 }
-
-function countCategory(records, field, value) {
-  return records.filter(record => record[field] === value).length;
-}
-
+function countCategory(records, field, value) { return records.filter(record => record[field] === value).length; }
 function renderBars(target, records, field) {
   const maximum = Math.max(records.length, 1);
-  target.innerHTML = ["Mild", "Moderate", "Severe"].map(category => {
-    const count = countCategory(records, field, category);
-    return `<div class="bar-row"><span>${category}</span><div class="bar-track"><div class="bar bar-${category.toLowerCase()}" style="width:${(count / maximum) * 100}%"></div></div><b>${count}</b></div>`;
-  }).join("");
+  target.innerHTML = ["Mild", "Moderate", "Severe"].map(category => { const count = countCategory(records, field, category); return `<div class="bar-row"><span>${category}</span><div class="bar-track"><div class="bar bar-${category.toLowerCase()}" style="width:${(count / maximum) * 100}%"></div></div><b>${count}</b></div>`; }).join("");
 }
-
 function renderStats() {
   const records = recordsForRange(document.querySelector("#statsRange").value);
   const adults = records.filter(record => record.patientType === "adult").length;
   const yellow = records.filter(record => record.uptriage === "Yellow Zone").length;
   const red = records.filter(record => record.uptriage === "Red Zone").length;
   const notDone = records.filter(record => record.pefrNotDone).length;
-  document.querySelector("#statsGrid").innerHTML = [
-    ["Jumlah penilaian", records.length],
-    ["Dewasa", adults],
-    ["Pediatrik", records.length - adults],
-    ["Uptriage Yellow", yellow],
-    ["Uptriage Red", red],
-    ["PEFR Not Done", notDone]
-  ].map(([label, value]) => `<div class="stat-card"><small>${label}</small><strong>${value}</strong></div>`).join("");
+  document.querySelector("#statsGrid").innerHTML = [["Jumlah penilaian", records.length], ["Dewasa", adults], ["Pediatrik", records.length - adults], ["Uptriage Yellow", yellow], ["Uptriage Red", red], ["PEFR Not Done", notDone]].map(([label, value]) => `<div class="stat-card"><small>${label}</small><strong>${value}</strong></div>`).join("");
   renderBars(document.querySelector("#beforeBars"), records, "categoryBefore");
   renderBars(document.querySelector("#afterBars"), records, "categoryAfter");
 }
-
 function setView(viewId) {
   document.querySelectorAll(".view").forEach(view => view.classList.toggle("is-active", view.id === viewId));
   document.querySelectorAll(".nav-button").forEach(button => button.classList.toggle("is-active", button.dataset.view === viewId));
-  if (viewId === "todayView") renderRecords();
-  if (viewId === "statsView") renderStats();
+  if (viewId === "todayView" || viewId === "statsView") loadSharedRecords();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function refreshForNewDay() {
-  const today = localDateKey();
-  if (today === activeDateKey) return;
-  activeDateKey = today;
-  if (!formDirty) setAssessmentTime(new Date());
-  renderRecords();
-  renderStats();
-}
-
-function scheduleDailyRefresh() {
-  const now = new Date();
-  const nextMidnight = new Date(now);
-  nextMidnight.setHours(24, 0, 1, 0);
-  window.setTimeout(() => {
-    refreshForNewDay();
-    scheduleDailyRefresh();
-  }, nextMidnight.getTime() - now.getTime());
-}
-
-form.addEventListener("input", () => {
-  formDirty = true;
-  calculateAll();
-});
+form.addEventListener("input", () => { formDirty = true; calculateAll(); });
 form.addEventListener("change", event => {
   formDirty = true;
   if (event.target.name === "patientType") updatePatientType();
@@ -429,52 +326,30 @@ form.addEventListener("change", event => {
 });
 form.addEventListener("submit", async event => {
   event.preventDefault();
-  const validAssessment = isPefrNotDone()
-    ? Boolean(selectedNotDoneReason())
-    : Boolean(state.ideal && state.beforePercentage !== null && state.afterPercentage !== null);
-  if (!form.reportValidity() || !validAssessment) {
-    showToast("Lengkapkan semua maklumat wajib dan bacaan PEFR.");
-    return;
-  }
+  const validAssessment = isPefrNotDone() ? Boolean(selectedNotDoneReason()) : Boolean(state.ideal && state.beforePercentage !== null && state.afterPercentage !== null);
+  if (!form.reportValidity() || !validAssessment) { showToast("Lengkapkan semua maklumat wajib dan bacaan PEFR."); return; }
   const saveButton = document.querySelector("#saveButton");
+  const record = makeRecord();
   saveButton.disabled = true;
-  const record = makeRecord(pendingRecordId);
-  upsertLocalRecord(record);
-  const hasEndpoint = Boolean(window.ASTHMA_CONFIG?.sheetEndpoint?.trim());
-  let synced = false;
+  addPending(record);
   try {
-    synced = await syncRecord(record);
+    await postRecord(record);
+    removePending(record.id);
+    showToast("Rekod dihantar ke Google Sheet.");
+    resetForm();
+    window.setTimeout(() => loadSharedRecords(), 1200);
   } catch {
-    synced = false;
-  }
-  if (hasEndpoint && !synced) {
-    record.syncStatus = "pending";
-    pendingRecordId = record.id;
-    upsertLocalRecord(record);
-    showToast("Gagal menghantar ke Google Sheet. Borang dikekalkan untuk cuba semula.");
-    saveButton.disabled = false;
-    return;
-  }
-  if (synced) {
-    record.syncStatus = "submitted";
-    upsertLocalRecord(record);
-  }
-  pendingRecordId = null;
-  showToast(synced ? "Rekod disimpan dan dihantar ke Google Sheet." : "Rekod disimpan pada peranti ini.");
-  saveButton.disabled = false;
-  resetForm();
+    showToast("Internet/Google Sheet gagal. Rekod disimpan sementara dalam telefon dan akan dicuba semula.");
+  } finally { saveButton.disabled = false; }
 });
 
 document.querySelector("#resetButton").addEventListener("click", resetForm);
 document.querySelector("#recordSearch").addEventListener("input", renderRecords);
-document.querySelector("#clearRecords").addEventListener("click", () => {
-  if (!confirm("Padam semua rekod yang disimpan pada peranti ini?")) return;
-  localStorage.removeItem(STORAGE_KEY);
-  renderRecords();
-  showToast("Semua rekod peranti telah dipadam.");
-});
+document.querySelector("#refreshRecords").addEventListener("click", () => loadSharedRecords(true));
+document.querySelector("#refreshStats").addEventListener("click", () => loadSharedRecords(true));
 document.querySelector("#statsRange").addEventListener("change", renderStats);
 document.querySelectorAll(".nav-button").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
+window.addEventListener("online", async () => { await retryPending(); await loadSharedRecords(); });
 
 const referenceDialog = document.querySelector("#referenceDialog");
 document.querySelectorAll(".reference-card").forEach(button => button.addEventListener("click", () => {
@@ -488,8 +363,8 @@ referenceDialog.addEventListener("click", event => { if (event.target === refere
 
 populatePaediatricHeights();
 setAssessmentTime();
-syncNotice.hidden = Boolean(window.ASTHMA_CONFIG?.sheetEndpoint?.trim());
-updatePatientType();
+syncNotice.hidden = Boolean(endpoint());
+if (!endpoint()) { syncNotice.hidden = false; syncNotice.textContent = "Google Sheet belum disambungkan. Rekod hanya boleh disimpan sementara pada peranti ini."; }
 updateNotDoneMode();
-scheduleDailyRefresh();
+retryPending().then(loadSharedRecords);
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
