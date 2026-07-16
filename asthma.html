@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#087f73">
+  <meta name="description" content="Dashboard Penilaian PEFR Pesakit Asma ETD Lepeh">
+  <title>Penilaian Asma · A.M.O ETD LEPEH</title>
+  <link rel="manifest" href="./manifest.json?v=4">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4">
+  <link rel="icon" type="image/png" href="./favicon.png?v=4">
+  <link rel="stylesheet" href="./styles.css?v=4">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <a class="back-link" href="./" aria-label="Kembali ke portal">‹</a>
+      <div class="app-title">
+        <strong>Penilaian Pesakit Asma</strong>
+        <small>PEFR · ETD Lepeh</small>
+      </div>
+      <img class="app-mark" src="./icon-192.png?v=4" alt="">
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <div class="notice">Alat ini membantu pengiraan dan dokumentasi PEFR. Keputusan klinikal serta uptriage kekal berdasarkan penilaian PPP/pegawai perubatan.</div>
+    <div id="syncNotice" class="notice sync-notice" hidden>Google Sheet belum disambungkan. Rekod disimpan pada peranti ini dahulu.</div>
+
+    <section id="newView" class="view is-active" aria-labelledby="newTitle">
+      <div class="section-heading">
+        <h1 id="newTitle">Penilaian baharu</h1>
+        <p>Lengkapkan maklumat, PEFR sebelum dan PEFR selepas.</p>
+      </div>
+
+      <form id="assessmentForm" novalidate>
+        <section class="card">
+          <h2><span class="step">1</span>Kategori & maklumat pesakit</h2>
+          <div class="field full">
+            <span class="fieldset-label">Kategori pesakit</span>
+            <div class="segmented">
+              <label><input type="radio" name="patientType" value="adult" checked><span>Dewasa</span></label>
+              <label><input type="radio" name="patientType" value="paediatric"><span>Pediatrik</span></label>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-top:13px">
+            <div class="field full">
+              <label for="patientName">Nama pesakit <small>(pilihan)</small></label>
+              <input id="patientName" name="patientName" autocomplete="off" maxlength="80">
+            </div>
+            <div class="field full">
+              <label for="patientId">No. IC / RN</label>
+              <input id="patientId" name="patientId" required autocomplete="off" maxlength="40">
+            </div>
+            <div class="field">
+              <label for="age">Umur</label>
+              <div class="unit-field"><input id="age" name="age" type="number" min="0" max="120" step="1" required><span class="unit">tahun</span></div>
+              <small id="ageHelp">Formula dewasa sah untuk umur 15–85 tahun.</small>
+            </div>
+            <div class="field">
+              <label for="sex">Jantina</label>
+              <select id="sex" name="sex" required>
+                <option value="">Pilih</option>
+                <option value="male">Lelaki</option>
+                <option value="female">Perempuan</option>
+              </select>
+            </div>
+            <div class="field full" id="adultHeightField">
+              <label for="heightAdult">Tinggi</label>
+              <div class="unit-field"><input id="heightAdult" name="heightAdult" type="number" min="120" max="210" step="1" required><span class="unit">cm</span></div>
+            </div>
+            <div class="field full" id="paediatricHeightField" hidden>
+              <label for="heightPaediatric">Tinggi rujukan pediatrik</label>
+              <select id="heightPaediatric" name="heightPaediatric">
+                <option value="">Pilih tinggi</option>
+              </select>
+              <small>Nilai tepat daripada jadual EU/EN13826; tiada interpolasi.</small>
+            </div>
+            <div class="field">
+              <label>Tarikh</label>
+              <input id="displayDate" disabled>
+            </div>
+            <div class="field">
+              <label>Masa</label>
+              <input id="displayTime" disabled>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2><span class="step">2</span>Vital signs</h2>
+          <div class="form-grid">
+            <div class="field">
+              <label for="bpSys">BP systolic</label>
+              <div class="unit-field"><input id="bpSys" name="bpSys" type="number" min="40" max="300"><span class="unit">mmHg</span></div>
+            </div>
+            <div class="field">
+              <label for="bpDia">BP diastolic</label>
+              <div class="unit-field"><input id="bpDia" name="bpDia" type="number" min="20" max="200"><span class="unit">mmHg</span></div>
+            </div>
+            <div class="field">
+              <label for="hr">HR</label>
+              <div class="unit-field"><input id="hr" name="hr" type="number" min="20" max="250"><span class="unit">bpm</span></div>
+            </div>
+            <div class="field">
+              <label for="rr">RR</label>
+              <div class="unit-field"><input id="rr" name="rr" type="number" min="5" max="100"><span class="unit">/min</span></div>
+            </div>
+            <div class="field">
+              <label for="temperature">Temperature</label>
+              <div class="unit-field"><input id="temperature" name="temperature" type="number" min="30" max="45" step="0.1"><span class="unit">°C</span></div>
+            </div>
+            <div class="field">
+              <label for="spo2">SpO₂</label>
+              <div class="unit-field"><input id="spo2" name="spo2" type="number" min="40" max="100"><span class="unit">%</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2><span class="step">3</span>Penilaian PEFR</h2>
+          <div class="ideal-card" aria-live="polite">
+            <div><small>PEFR IDEAL / PREDICTED</small><strong id="idealValue">— L/min</strong></div>
+            <div id="idealMethod" class="ideal-method">Lengkapkan umur, jantina dan tinggi.</div>
+          </div>
+          <div class="form-grid" style="margin-top:14px">
+            <div class="field">
+              <label for="pefrBefore">PEFR Before</label>
+              <div class="unit-field"><input id="pefrBefore" name="pefrBefore" type="number" min="1" max="900" required disabled><span class="unit">L/min</span></div>
+            </div>
+            <div class="field">
+              <label for="pefrAfter">PEFR After</label>
+              <div class="unit-field"><input id="pefrAfter" name="pefrAfter" type="number" min="1" max="900" required disabled><span class="unit">L/min</span></div>
+            </div>
+          </div>
+          <div class="result-grid" aria-live="polite">
+            <article class="result-card">
+              <small>PEFR Before</small>
+              <div id="beforePercent" class="result-value">—%</div>
+              <span id="beforeCategory" class="category-badge category-empty">Belum dikira</span>
+            </article>
+            <article class="result-card">
+              <small>PEFR After</small>
+              <div id="afterPercent" class="result-value">—%</div>
+              <span id="afterCategory" class="category-badge category-empty">Belum dikira</span>
+            </article>
+          </div>
+        </section>
+
+        <section id="uptriageCard" class="card uptriage-card" hidden>
+          <h2><span class="step">4</span>Uptriage oleh PPP</h2>
+          <p style="margin:-5px 0 14px;color:var(--muted);font-size:.83rem">Pilih berdasarkan penilaian klinikal. Sistem tidak mencadangkan zon.</p>
+          <div class="segmented three">
+            <label><input type="radio" name="uptriage" value="None" checked><span>Tiada</span></label>
+            <label><input type="radio" name="uptriage" value="Yellow Zone"><span>Yellow Zone</span></label>
+            <label><input type="radio" name="uptriage" value="Red Zone"><span>Red Zone</span></label>
+          </div>
+        </section>
+
+        <section id="summaryCard" class="card summary-card" hidden>
+          <h2><span class="step">5</span>Ringkasan sebelum simpan</h2>
+          <dl id="summaryList" class="summary-list"></dl>
+          <div class="actions">
+            <button id="resetButton" class="btn btn-secondary" type="button">Kosongkan</button>
+            <button id="saveButton" class="btn btn-primary" type="submit">Simpan Rekod</button>
+          </div>
+        </section>
+      </form>
+    </section>
+
+    <section id="todayView" class="view" aria-labelledby="todayTitle">
+      <div class="section-heading"><h2 id="todayTitle">Penilaian hari ini</h2><p>Rekod yang disimpan pada peranti ini.</p></div>
+      <div class="filter-row"><input id="recordSearch" type="search" placeholder="Cari IC / RN"><button id="clearRecords" class="btn btn-danger" type="button">Padam semua</button></div>
+      <div id="recordList" class="record-list"></div>
+    </section>
+
+    <section id="statsView" class="view" aria-labelledby="statsTitle">
+      <div class="section-heading"><h2 id="statsTitle">Statistik PEFR</h2><p>Ringkasan rekod pada peranti ini.</p></div>
+      <div class="filter-row">
+        <select id="statsRange"><option value="today">Hari ini</option><option value="yesterday">Semalam</option><option value="week">Minggu ini</option><option value="month">Bulan ini</option><option value="all">Semua</option></select>
+      </div>
+      <div id="statsGrid" class="stats-grid"></div>
+      <div class="card stat-section"><h3>Kategori Before</h3><div id="beforeBars"></div></div>
+      <div class="card stat-section"><h3>Kategori After</h3><div id="afterBars"></div></div>
+    </section>
+
+    <section id="referenceView" class="view" aria-labelledby="referenceTitle">
+      <div class="section-heading"><h2 id="referenceTitle">Rujukan klinikal</h2><p>Tekan gambar untuk paparan skrin penuh dan zum.</p></div>
+      <div class="reference-grid">
+        <button class="reference-card" type="button" data-image="./references/adult-pefr-chart.jpeg" data-title="Carta PEFR Dewasa"><img src="./references/adult-pefr-chart.jpeg" alt="Carta PEFR dewasa"><strong>Carta PEFR Dewasa</strong><small>EU/EN13826</small></button>
+        <button class="reference-card" type="button" data-image="./references/paediatric-pefr-table.jpeg" data-title="Jadual PEFR Pediatrik"><img src="./references/paediatric-pefr-table.jpeg" alt="Jadual PEFR pediatrik"><strong>Jadual PEFR Pediatrik</strong><small>Berdasarkan tinggi</small></button>
+        <button class="reference-card" type="button" data-image="./references/pefr-interpretation.jpeg" data-title="Interpretasi PEFR"><img src="./references/pefr-interpretation.jpeg" alt="Carta interpretasi PEFR"><strong>Interpretasi PEFR</strong><small>Mild · Moderate · Severe</small></button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Menu dashboard">
+    <button class="nav-button is-active" data-view="newView"><span>＋</span>Penilaian</button>
+    <button class="nav-button" data-view="todayView"><span>▤</span>Hari ini</button>
+    <button class="nav-button" data-view="statsView"><span>▥</span>Statistik</button>
+    <button class="nav-button" data-view="referenceView"><span>▣</span>Rujukan</button>
+  </nav>
+
+  <dialog id="referenceDialog" class="reference-dialog">
+    <div class="dialog-head"><strong id="dialogTitle">Rujukan</strong><button id="dialogClose" class="dialog-close" type="button" aria-label="Tutup">×</button></div>
+    <div class="dialog-image-wrap"><img id="dialogImage" alt=""></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="./config.js?v=4"></script>
+  <script type="module" src="./asthma.mjs?v=4"></script>
+</body>
+</html>
