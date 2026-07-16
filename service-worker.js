@@ -1,13 +1,12 @@
-const CACHE = "amo-etd-lepeh-v9";
+const CACHE = "amo-etd-lepeh-v10";
 const ASSETS = [
   "./",
   "./index.html",
   "./asthma.html",
   "./styles.css?v=4",
   "./config.js?v=5",
-  "./bp-mobile-fix.js?v=1",
   "./pefr.mjs",
-  "./asthma.mjs?v=7",
+  "./asthma.mjs?v=9",
   "./manifest.json?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",
