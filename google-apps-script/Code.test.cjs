@@ -20,6 +20,12 @@ class Range {
       Array.from({ length: this.columnCount }, (_, x) => String(this.sheet.getCell(this.row + y, this.column + x) ?? ""))
     );
   }
+  getValues() {
+    return Array.from({ length: this.rowCount }, (_, y) =>
+      Array.from({ length: this.columnCount }, (_, x) => this.sheet.getCell(this.row + y, this.column + x))
+    );
+  }
+  setValue(value) { this.sheet.setCell(this.row, this.column, value); return this; }
   setFontWeight() { return this; }
   setBackground() { return this; }
   setFontColor() { return this; }
@@ -49,6 +55,7 @@ class Sheet {
     this.rows[row - 1][column - 1] = value;
   }
   appendRow(row) { this.rows.push([...row]); }
+  deleteColumn(column) { this.rows.forEach(row => row.splice(column - 1, 1)); }
   setFrozenRows() {}
   autoResizeColumns() {}
 }
@@ -78,7 +85,7 @@ const context = {
 };
 
 const source = fs.readFileSync(path.join(__dirname, "Code.gs"), "utf8") +
-  "\n;globalThis.__api={setupAsthmaSheets,saveAsthmaAssessment_,doPost};";
+  "\n;globalThis.__api={setupAsthmaSheets,saveAsthmaAssessment_,migrateSplitBpColumns_,doPost};";
 vm.runInNewContext(source, context);
 const api = context.__api;
 
@@ -95,8 +102,7 @@ const base = {
   age: 30,
   sex: "male",
   height: 175,
-  bpSys: 120,
-  bpDia: 80,
+  bp: "120/80",
   hr: 90,
   rr: 20,
   temperature: 37,
@@ -126,29 +132,41 @@ api.saveAsthmaAssessment_({
 });
 
 const assessment = spreadsheet.getSheetByName("Asthma_Assessment");
-assert.equal(assessment.rows[0].length, 28);
-assert.equal(assessment.rows[1].length, 28);
+assert.equal(assessment.rows[0].length, 27);
+assert.equal(assessment.rows[1].length, 27);
 assert.match(assessment.rows[1][0], /^AST-20260716-001$/);
 assert.match(assessment.rows[2][0], /^AST-20260716-002$/);
-assert.equal(assessment.rows[1][27], "PPP Rosli");
-assert.equal(assessment.rows[2][27], "PPP Aminah");
+assert.equal(assessment.rows[1][10], "120/80");
+assert.equal(assessment.rows[1][26], "PPP Rosli");
+assert.equal(assessment.rows[2][26], "PPP Aminah");
 assert.equal(assessment.rows[2][4], "Pediatrik");
-assert.equal(assessment.rows[2][17], "");
-assert.equal(assessment.rows[2][24], true);
-assert.equal(assessment.rows[2][25], "Unable");
+assert.equal(assessment.rows[2][16], "");
+assert.equal(assessment.rows[2][23], true);
+assert.equal(assessment.rows[2][24], "Unable");
 
 const dashboard = spreadsheet.getSheetByName("Asthma_Dashboard");
 assert.match(dashboard.rows[1][1], /COUNTA/);
-assert.match(dashboard.rows[12][1], /Y2:Y,TRUE/);
+assert.match(dashboard.rows[12][1], /X2:X,TRUE/);
 
 const reference = spreadsheet.getSheetByName("PEFR_Reference");
 assert.ok(reference.rows.some(row => row[0] === 130 && row[1] === 212));
+
+const legacy = new Sheet("Legacy_Assessment");
+const legacyHeaders = [...assessment.rows[0].slice(0, 10), "BP Systolic", "BP Diastolic", ...assessment.rows[0].slice(11)];
+legacy.appendRow(legacyHeaders);
+legacy.appendRow([...assessment.rows[1].slice(0, 10), 118, 76, ...assessment.rows[1].slice(11)]);
+api.migrateSplitBpColumns_(legacy);
+assert.equal(legacy.rows[0].length, 27);
+assert.equal(legacy.rows[0][10], "BP");
+assert.equal(legacy.rows[1][10], "118/76");
 
 console.log(JSON.stringify({
   tabs: spreadsheet.sheets.size,
   columns: assessment.rows[0].length,
   records: assessment.rows.length - 1,
-  lastColumn: assessment.rows[0][27],
-  normalPpp: assessment.rows[1][27],
-  notDonePpp: assessment.rows[2][27]
+  lastColumn: assessment.rows[0][26],
+  bp: assessment.rows[1][10],
+  normalPpp: assessment.rows[1][26],
+  notDonePpp: assessment.rows[2][26],
+  migratedBp: legacy.rows[1][10]
 }));

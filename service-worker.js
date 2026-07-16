@@ -1,4 +1,4 @@
-const CACHE = "amo-etd-lepeh-v6";
+const CACHE = "amo-etd-lepeh-v7";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,7 +6,7 @@ const ASSETS = [
   "./styles.css?v=4",
   "./config.js?v=4",
   "./pefr.mjs",
-  "./asthma.mjs?v=6",
+  "./asthma.mjs?v=7",
   "./manifest.json?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",

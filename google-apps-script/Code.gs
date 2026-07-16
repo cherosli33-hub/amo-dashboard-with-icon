@@ -18,8 +18,7 @@ const ASSESSMENT_HEADERS = Object.freeze([
   "Umur",
   "Jantina",
   "Tinggi (cm)",
-  "BP Systolic",
-  "BP Diastolic",
+  "BP",
   "HR",
   "RR",
   "Temperature",
@@ -36,6 +35,13 @@ const ASSESSMENT_HEADERS = Object.freeze([
   "Not Done Reason",
   "Not Done Other",
   "Nama PPP"
+]);
+
+const LEGACY_SPLIT_BP_HEADERS = Object.freeze([
+  ...ASSESSMENT_HEADERS.slice(0, 10),
+  "BP Systolic",
+  "BP Diastolic",
+  ...ASSESSMENT_HEADERS.slice(11)
 ]);
 
 const PAEDIATRIC_REFERENCE = Object.freeze([
@@ -108,8 +114,7 @@ function saveAsthmaAssessment_(record) {
       numberOrBlank_(record.age),
       record.sex === "female" ? "Perempuan" : "Lelaki",
       numberOrBlank_(record.height),
-      numberOrBlank_(record.bpSys),
-      numberOrBlank_(record.bpDia),
+      bpValue_(record),
       numberOrBlank_(record.hr),
       numberOrBlank_(record.rr),
       numberOrBlank_(record.temperature),
@@ -144,9 +149,27 @@ function setupAssessmentSheet_(spreadsheet) {
       .setFontColor("#ffffff");
     sheet.getRange("B:B").setNumberFormat("dd/MM/yyyy HH:mm:ss");
     sheet.autoResizeColumns(1, ASSESSMENT_HEADERS.length);
+  } else if (headersMatch_(sheet, LEGACY_SPLIT_BP_HEADERS)) {
+    migrateSplitBpColumns_(sheet);
   } else {
     assertHeaders_(sheet, ASSESSMENT_HEADERS);
   }
+}
+
+function migrateSplitBpColumns_(sheet) {
+  const dataRows = sheet.getLastRow() - 1;
+  if (dataRows > 0) {
+    const values = sheet.getRange(2, 11, dataRows, 2).getValues();
+    const combined = values.map(function (row) {
+      const systolic = clean_(row[0]);
+      const diastolic = clean_(row[1]);
+      return [systolic && diastolic ? systolic + "/" + diastolic : systolic || diastolic];
+    });
+    sheet.getRange(2, 11, dataRows, 1).setValues(combined);
+  }
+  sheet.deleteColumn(12);
+  sheet.getRange(1, 11).setValue("BP");
+  assertHeaders_(sheet, ASSESSMENT_HEADERS);
 }
 
 function setupDashboardSheet_(spreadsheet) {
@@ -158,15 +181,15 @@ function setupDashboardSheet_(spreadsheet) {
     ["Jumlah Penilaian", `=COUNTA('${source}'!A2:A)`],
     ["Dewasa", `=COUNTIF('${source}'!E2:E,"Dewasa")`],
     ["Pediatrik", `=COUNTIF('${source}'!E2:E,"Pediatrik")`],
-    ["Mild Before", `=COUNTIF('${source}'!T2:T,"Mild")`],
-    ["Moderate Before", `=COUNTIF('${source}'!T2:T,"Moderate")`],
-    ["Severe Before", `=COUNTIF('${source}'!T2:T,"Severe")`],
-    ["Mild After", `=COUNTIF('${source}'!W2:W,"Mild")`],
-    ["Moderate After", `=COUNTIF('${source}'!W2:W,"Moderate")`],
-    ["Severe After", `=COUNTIF('${source}'!W2:W,"Severe")`],
-    ["Uptriage Yellow Zone", `=COUNTIF('${source}'!X2:X,"Yellow Zone")`],
-    ["Uptriage Red Zone", `=COUNTIF('${source}'!X2:X,"Red Zone")`],
-    ["PEFR Not Done", `=COUNTIF('${source}'!Y2:Y,TRUE)`]
+    ["Mild Before", `=COUNTIF('${source}'!S2:S,"Mild")`],
+    ["Moderate Before", `=COUNTIF('${source}'!S2:S,"Moderate")`],
+    ["Severe Before", `=COUNTIF('${source}'!S2:S,"Severe")`],
+    ["Mild After", `=COUNTIF('${source}'!V2:V,"Mild")`],
+    ["Moderate After", `=COUNTIF('${source}'!V2:V,"Moderate")`],
+    ["Severe After", `=COUNTIF('${source}'!V2:V,"Severe")`],
+    ["Uptriage Yellow Zone", `=COUNTIF('${source}'!W2:W,"Yellow Zone")`],
+    ["Uptriage Red Zone", `=COUNTIF('${source}'!W2:W,"Red Zone")`],
+    ["PEFR Not Done", `=COUNTIF('${source}'!X2:X,TRUE)`]
   ];
   sheet.getRange(1, 1, rows.length, 2).setValues(rows);
   sheet.setFrozenRows(1);
@@ -262,10 +285,14 @@ function getOrCreateSheet_(spreadsheet, name) {
 }
 
 function assertHeaders_(sheet, headers) {
-  const actual = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0];
-  if (actual.join("|") !== headers.join("|")) {
+  if (!headersMatch_(sheet, headers)) {
     throw new Error("Header " + sheet.getName() + " tidak sepadan. Jangan ubah susunan kolum.");
   }
+}
+
+function headersMatch_(sheet, headers) {
+  const actual = sheet.getRange(1, 1, 1, headers.length).getDisplayValues()[0];
+  return actual.join("|") === headers.join("|");
 }
 
 function validDate_(value) {
@@ -277,6 +304,14 @@ function numberOrBlank_(value) {
   if (value === null || value === undefined || value === "") return "";
   const number = Number(value);
   return Number.isFinite(number) ? number : "";
+}
+
+function bpValue_(record) {
+  const combined = clean_(record.bp).replace(/\s+/g, "");
+  if (combined) return combined;
+  const systolic = numberOrBlank_(record.bpSys);
+  const diastolic = numberOrBlank_(record.bpDia);
+  return systolic !== "" && diastolic !== "" ? systolic + "/" + diastolic : "";
 }
 
 function clean_(value) {
