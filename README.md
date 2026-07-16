@@ -1,47 +1,28 @@
 # A.M.O ETD LEPEH
 
-PWA mudah alih yang menyediakan satu portal untuk:
-
-1. Dashboard Log Prosedur A.M.O sedia ada.
-2. Dashboard Penilaian PEFR Pesakit Asma.
+Progressive Web App (PWA) untuk membuka dashboard **Log Prosedur A.M.O ETD Lepeh** daripada ikon Home Screen.
 
 ## URL aplikasi
 
 `https://cherosli33-hub.github.io/amo-dashboard-with-icon/`
 
-## Modul Penilaian Asma
-
-Modul Asma merangkumi:
-
-- PEFR ideal dewasa berdasarkan persamaan Nunn–Gregg dan penukaran skala EU/EN13826.
-- PEFR ideal pediatrik berdasarkan jadual tinggi 85–170 cm yang dibekalkan.
-- Pengiraan `%PEFR = observed ÷ predicted × 100`.
-- Kategori Mild `>80%`, Moderate `60–80%`, dan Severe `<60%`.
-- PEFR Before dan After.
-- Uptriage manual oleh PPP: Tiada, Yellow Zone, atau Red Zone.
-- Senarai penilaian hari ini dan statistik asas pada peranti.
-- Rujukan klinikal dewasa, pediatrik, dan interpretasi PEFR.
-
-Modul tidak membuat cadangan uptriage atau keputusan klinikal automatik.
-
-## Penyimpanan Google Sheet
-
-Secara lalai, rekod disimpan dalam `localStorage` peranti. Untuk penyegerakan Google Sheet, isi `sheetEndpoint` dalam `config.js` dengan URL Apps Script `/exec` yang menerima payload berikut melalui `doPost(e)`:
-
-```json
-{
-  "action": "saveAsthmaAssessment",
-  "record": {}
-}
-```
-
-Endpoint sengaja diasingkan supaya modul Asma tidak mengubah fungsi Sheet Dashboard A.M.O sedia ada.
-
 ## Pasang pada telefon
 
-- Android/Chrome: buka URL aplikasi, pilih **Install app** atau **Add to Home screen**.
-- iPhone/Safari: buka URL aplikasi, pilih **Share > Add to Home Screen**.
+- **Android / Chrome:** buka URL aplikasi, tekan menu, kemudian **Add to Home screen** atau **Install app**.
+- **iPhone / Safari:** buka URL aplikasi, tekan **Share**, kemudian **Add to Home Screen**.
+
+Apabila ikon aplikasi dibuka, pelancar akan menghala ke Google Apps Script `/exec` yang menyediakan dashboard. Sambungan internet diperlukan untuk data Google Sheet.
 
 ## GitHub Pages
 
-Gunakan **Deploy from a branch**, branch `main`, folder `/ (root)`.
+Tetapkan **Settings > Pages > Build and deployment** kepada:
+
+- Source: **Deploy from a branch**
+- Branch: **main**
+- Folder: **/ (root)**
+
+Fail PWA berada terus di root repository.
+
+## Nota teknikal
+
+Apps Script menghantar polisi keselamatan yang menghalang paparan dalam `iframe` dari domain lain. Oleh itu, PWA ini membuka URL dashboard secara terus dan tidak mengubah sebarang fungsi Google Sheet atau Apps Script.
