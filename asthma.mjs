@@ -92,11 +92,11 @@ function updatePatientType() {
   paediatricHeightInput.required = !isAdult;
   paediatricHeightInput.disabled = isAdult;
   ageInput.min = isAdult ? "15" : "0";
-  ageInput.max = isAdult ? "85" : "12";
+  ageInput.max = isAdult ? "85" : "14";
   if (ageInput.value && !ageInput.checkValidity()) ageInput.value = "";
   ageHelp.textContent = isAdult
     ? "Formula dewasa sah untuk umur 15–85 tahun. Rujukan ini tidak meliputi umur 13–14 tahun."
-    : "Pediatrik sehingga 12 tahun; PEFR ideal menggunakan tinggi sahaja.";
+    : "Pediatrik 0–14 tahun; PEFR ideal menggunakan tinggi sahaja.";
   calculateAll();
 }
 
