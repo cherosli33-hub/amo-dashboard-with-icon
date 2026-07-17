@@ -170,6 +170,7 @@ function setupAssessmentSheet_(spreadsheet) {
     if (!sheet.getFilter()) sheet.getRange(1, 1, sheet.getMaxRows(), ASSESSMENT_HEADERS.length).createFilter();
   }
   setupNotDoneCheckbox_(sheet);
+  sheet.hideColumns(1);
 }
 
 function setupNotDoneCheckbox_(sheet) {
@@ -246,6 +247,7 @@ function setupMonthlySheet_(spreadsheet) {
   sheet.getRange(6, 1, rows.length, 2).setValues(rows);
   sheet.getRange("D1").setValue("SENARAI REKOD BULAN DIPILIH").setFontWeight("bold");
   sheet.getRange("D2").setFormula(`=IFERROR({'${source}'!A1:AA1;FILTER('${source}'!A2:AA,'${source}'!C2:C>=${monthStart},'${source}'!C2:C<${monthEnd})},"Tiada rekod")`);
+  sheet.hideColumns(4);
   sheet.getRange("B2").setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(1, 12).build());
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, 5);

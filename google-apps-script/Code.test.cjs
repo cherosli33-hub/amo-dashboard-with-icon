@@ -67,6 +67,7 @@ class Sheet {
   getMaxRows() { return Math.max(this.rows.length, 1000); }
   setFrozenRows() {}
   autoResizeColumns() {}
+  hideColumns() {}
 }
 
 class Spreadsheet {
