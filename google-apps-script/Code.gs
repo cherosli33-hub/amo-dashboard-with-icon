@@ -163,6 +163,14 @@ function setupAssessmentSheet_(spreadsheet) {
     assertHeaders_(sheet, ASSESSMENT_HEADERS);
     if (!sheet.getFilter()) sheet.getRange(1, 1, sheet.getMaxRows(), ASSESSMENT_HEADERS.length).createFilter();
   }
+  setupNotDoneCheckbox_(sheet);
+}
+
+function setupNotDoneCheckbox_(sheet) {
+  const pefrNotDoneColumn = ASSESSMENT_HEADERS.indexOf("PEFR Not Done") + 1;
+  sheet.getRange(2, pefrNotDoneColumn, Math.max(sheet.getMaxRows() - 1, 1), 1)
+    .setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build())
+    .setHorizontalAlignment("center");
 }
 
 function migrateSplitBpColumns_(sheet) {

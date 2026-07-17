@@ -35,6 +35,8 @@ Kod backend tersedia dalam folder `google-apps-script`. Fungsi `setupAsthmaSheet
 2. `Asthma_Monthly_View` — paparan dan statistik bulanan daripada `Asthma_Assessment`.
 3. `Asthma_Yearly_View` — paparan dan statistik tahunan daripada `Asthma_Assessment`.
 
+Kolum `PEFR Not Done` menggunakan checkbox: kotak kosong bermaksud PEFR dibuat, manakala tanda ✓ bermaksud PEFR tidak dapat dilakukan.
+
 ### Cara menyediakan Apps Script
 
 1. Buka Google Sheet yang hendak digunakan.

@@ -33,13 +33,15 @@ class Range {
   merge() { return this; }
   createFilter() { this.sheet.filter = true; return this; }
   setFormula(value) { return this.setValue(value); }
-  setDataValidation() { return this; }
+  setDataValidation(validation) { this.sheet.validations.push({ row: this.row, column: this.column, rowCount: this.rowCount, columnCount: this.columnCount, validation }); return this; }
+  setHorizontalAlignment() { return this; }
 }
 
 class Sheet {
   constructor(name) {
     this.name = name;
     this.rows = [];
+    this.validations = [];
   }
   getName() { return this.name; }
   getLastRow() {
@@ -86,7 +88,7 @@ const context = {
     getActiveSpreadsheet: () => spreadsheet,
     openById: () => spreadsheet,
     flush() {},
-    newDataValidation: () => ({ requireNumberBetween() { return this; }, build() { return {}; } })
+    newDataValidation: () => ({ requireNumberBetween() { return this; }, requireCheckbox() { this.checkbox = true; return this; }, build() { return { checkbox: Boolean(this.checkbox) }; } })
   },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   Utilities: { formatDate: (date, _zone, pattern) => pattern === "yyyyMMdd" ? date.toISOString().slice(0, 10).replaceAll("-", "") : date.toISOString().slice(0, 10) },
@@ -160,6 +162,7 @@ assert.equal(assessment.rows[2][4], "Pediatrik");
 assert.equal(assessment.rows[2][16], "");
 assert.equal(assessment.rows[2][23], true);
 assert.equal(assessment.rows[2][24], "Unable");
+assert.ok(assessment.validations.some(item => item.column === 24 && item.validation.checkbox));
 
 assessment.rows[1][2] = new Date("2026-07-16T07:00:00.000Z");
 const listed = api.listAsthmaAssessments_();
