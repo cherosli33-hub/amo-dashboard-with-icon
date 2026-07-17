@@ -91,7 +91,7 @@ function saveAsthmaAssessment_(record) {
     if (recordIdExists_(sheet, recordId)) return { recordId: recordId, duplicate: true };
 
     const notDone = Boolean(record.pefrNotDone);
-    sheet.appendRow([
+    const rowValues = [
       recordId,
       validDate_(record.timestamp) || now,
       clean_(record.date), clean_(record.time),
@@ -111,7 +111,11 @@ function saveAsthmaAssessment_(record) {
       notDone ? clean_(record.notDoneReason) : "",
       notDone ? clean_(record.notDoneOther) : "",
       clean_(record.pppName)
-    ]);
+    ];
+    const targetRow = lastRecordRow_(sheet) + 1;
+    if (targetRow > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), targetRow - sheet.getMaxRows());
+    sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+    setNotDoneCheckbox_(sheet, targetRow);
     SpreadsheetApp.flush();
     return { recordId: recordId, duplicate: false };
   } finally {
@@ -121,9 +125,11 @@ function saveAsthmaAssessment_(record) {
 
 function listAsthmaAssessments_() {
   const sheet = getSpreadsheet_().getSheetByName(ASTHMA_CONFIG.ASSESSMENT_SHEET);
-  if (!sheet || sheet.getLastRow() < 2) return [];
+  if (!sheet) return [];
   assertHeaders_(sheet, ASSESSMENT_HEADERS);
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, ASSESSMENT_HEADERS.length).getValues();
+  const lastRow = lastRecordRow_(sheet);
+  if (lastRow < 2) return [];
+  const rows = sheet.getRange(2, 1, lastRow - 1, ASSESSMENT_HEADERS.length).getValues();
   return rows.map(function (row) {
     return {
       id: clean_(row[0]),
@@ -168,9 +174,28 @@ function setupAssessmentSheet_(spreadsheet) {
 
 function setupNotDoneCheckbox_(sheet) {
   const pefrNotDoneColumn = ASSESSMENT_HEADERS.indexOf("PEFR Not Done") + 1;
-  sheet.getRange(2, pefrNotDoneColumn, Math.max(sheet.getMaxRows() - 1, 1), 1)
+  const lastRow = lastRecordRow_(sheet);
+  if (lastRow < 2) return;
+  sheet.getRange(2, pefrNotDoneColumn, lastRow - 1, 1)
     .setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build())
     .setHorizontalAlignment("center");
+}
+
+function setNotDoneCheckbox_(sheet, row) {
+  const column = ASSESSMENT_HEADERS.indexOf("PEFR Not Done") + 1;
+  sheet.getRange(row, column)
+    .setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build())
+    .setHorizontalAlignment("center");
+}
+
+function lastRecordRow_(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return 1;
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+  for (let index = ids.length - 1; index >= 0; index -= 1) {
+    if (clean_(ids[index][0])) return index + 2;
+  }
+  return 1;
 }
 
 function migrateSplitBpColumns_(sheet) {
@@ -285,14 +310,16 @@ function validateRecord_(record) {
 }
 
 function recordIdExists_(sheet, recordId) {
-  if (!recordId || sheet.getLastRow() < 2) return false;
-  return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues().flat().includes(recordId);
+  const lastRow = lastRecordRow_(sheet);
+  if (!recordId || lastRow < 2) return false;
+  return sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues().flat().includes(recordId);
 }
 
 function nextRecordId_(sheet, date) {
   const datePart = Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyyMMdd");
   const prefix = "AST-" + datePart + "-";
-  const ids = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues().flat();
+  const lastRow = lastRecordRow_(sheet);
+  const ids = lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues().flat();
   return prefix + String(ids.filter(function (id) { return String(id).indexOf(prefix) === 0; }).length + 1).padStart(3, "0");
 }
 

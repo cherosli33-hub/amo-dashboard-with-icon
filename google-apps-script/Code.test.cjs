@@ -60,6 +60,7 @@ class Sheet {
     this.rows[row - 1][column - 1] = value;
   }
   appendRow(row) { this.rows.push([...row]); }
+  insertRowsAfter(afterPosition, howMany) { this.rows.splice(afterPosition, 0, ...Array.from({ length: howMany }, () => [])); }
   deleteColumn(column) { this.rows.forEach(row => row.splice(column - 1, 1)); }
   clear() { this.rows = []; this.filter = false; }
   getFilter() { return this.filter ? {} : null; }
