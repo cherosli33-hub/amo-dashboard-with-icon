@@ -29,11 +29,12 @@ Modul tidak membuat cadangan uptriage atau keputusan klinikal automatik.
 
 ## Penyimpanan Google Sheet
 
-Kod backend tersedia dalam folder `google-apps-script`. Fungsi `setupAsthmaSheets()` membina tiga tab tanpa mengubah tab Dashboard A.M.O:
+Kod backend tersedia dalam folder `google-apps-script`. Fungsi `setupAsthmaSheets()` membina empat tab tanpa mengubah tab Dashboard A.M.O:
 
 1. `Asthma_Assessment` — satu baris bagi setiap penilaian, termasuk `Record ID`, PEFR Not Done dan `Nama PPP`.
 2. `Asthma_Monthly_View` — paparan dan statistik bulanan daripada `Asthma_Assessment`.
 3. `Asthma_Yearly_View` — paparan dan statistik tahunan daripada `Asthma_Assessment`.
+4. `Asthma_Print_View` — laporan bulanan padat untuk cetakan A4 Landscape menggunakan tetapan Fit to width.
 
 Kolum `PEFR Not Done` menggunakan checkbox: kotak kosong bermaksud PEFR dibuat, manakala tanda ✓ bermaksud PEFR tidak dapat dilakukan.
 
@@ -43,7 +44,7 @@ Kolum `PEFR Not Done` menggunakan checkbox: kotak kosong bermaksud PEFR dibuat, 
 2. Pilih **Extensions > Apps Script**.
 3. Salin kandungan `google-apps-script/Code.gs` ke fail `Code.gs`.
 4. Jalankan `setupAsthmaSheets()` sekali dan benarkan akses yang diminta.
-5. Semak tiga tab di atas telah dicipta.
+5. Semak empat tab di atas telah dicipta.
 6. Pilih **Deploy > New deployment > Web app**.
 7. Tetapkan **Execute as: Me** dan akses yang membolehkan PWA menghantar rekod.
 8. Salin URL deployment yang berakhir dengan `/exec`.

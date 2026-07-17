@@ -5,6 +5,7 @@ const ASTHMA_CONFIG = Object.freeze({
   ASSESSMENT_SHEET: "Asthma_Assessment",
   MONTHLY_SHEET: "Asthma_Monthly_View",
   YEARLY_SHEET: "Asthma_Yearly_View",
+  PRINT_SHEET: "Asthma_Print_View",
   LEGACY_SHEETS: ["Asthma_Dashboard", "PEFR_Reference"]
 });
 
@@ -29,13 +30,15 @@ function setupAsthmaSheets() {
   setupAssessmentSheet_(spreadsheet);
   setupMonthlySheet_(spreadsheet);
   setupYearlySheet_(spreadsheet);
+  setupPrintSheet_(spreadsheet);
   removeLegacySheets_(spreadsheet);
   return {
     spreadsheetId: spreadsheet.getId(),
     sheets: [
       ASTHMA_CONFIG.ASSESSMENT_SHEET,
       ASTHMA_CONFIG.MONTHLY_SHEET,
-      ASTHMA_CONFIG.YEARLY_SHEET
+      ASTHMA_CONFIG.YEARLY_SHEET,
+      ASTHMA_CONFIG.PRINT_SHEET
     ]
   };
 }
@@ -288,6 +291,49 @@ function setupYearlySheet_(spreadsheet) {
   ]);
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, 12);
+}
+
+function setupPrintSheet_(spreadsheet) {
+  const sheet = getOrCreateSheet_(spreadsheet, ASTHMA_CONFIG.PRINT_SHEET);
+  sheet.clear();
+  const source = `'${ASTHMA_CONFIG.ASSESSMENT_SHEET}'`;
+  const now = new Date();
+  const printFormula = [
+    '{"Tarikh / Masa","IC / RN","Pesakit","Umur / Jantina","Vital Signs","PEFR Ideal","PEFR Before","PEFR After","Uptriage","PEFR Not Done","Nama PPP";',
+    'FILTER({',
+    `TEXT(${source}!C2:C,"dd/MM/yyyy")&CHAR(10)&${source}!D2:D,`,
+    `${source}!G2:G,`,
+    `${source}!E2:E&CHAR(10)&${source}!F2:F,`,
+    `${source}!H2:H&" thn / "&${source}!I2:I,`,
+    `"BP "&${source}!K2:K&CHAR(10)&"HR "&${source}!L2:L&" | RR "&${source}!M2:M&CHAR(10)&"T "&${source}!N2:N&" | SpO2 "&${source}!O2:O,`,
+    `${source}!P2:P,`,
+    `IF(${source}!X2:X=TRUE,"Not Done",${source}!Q2:Q&" L/min"&CHAR(10)&${source}!R2:R&"% - "&${source}!S2:S),`,
+    `IF(${source}!X2:X=TRUE,"Not Done",${source}!T2:T&" L/min"&CHAR(10)&${source}!U2:U&"% - "&${source}!V2:V),`,
+    `${source}!W2:W,`,
+    `IF(${source}!X2:X=TRUE,"YA - "&${source}!Y2:Y&IF(${source}!Z2:Z<>""," ("&${source}!Z2:Z&")",""),""),`,
+    `${source}!AA2:AA},`,
+    `${source}!C2:C>=DATE($D$2,$B$2,1),`,
+    `${source}!C2:C<EDATE(DATE($D$2,$B$2,1),1))}`,
+  ].join("");
+
+  sheet.getRange("A1:K1").merge().setValue("LAPORAN BULANAN PENILAIAN PEFR ASMA")
+    .setFontWeight("bold").setBackground("#0f766e").setFontColor("#ffffff");
+  sheet.getRange("A2:H2").setValues([[
+    "Bulan (1-12)", now.getMonth() + 1, "Tahun", now.getFullYear(),
+    "Tempoh", '=CHOOSE(B2,"Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember")&" "&D2',
+    "Jumlah Rekod", `=COUNTIFS(${source}!C2:C,">="&DATE(D2,B2,1),${source}!C2:C,"<"&EDATE(DATE(D2,B2,1),1))`
+  ]]);
+  sheet.getRange("A3:K3").merge().setValue("Pilih bulan dan tahun di atas. Cetak tab ini sahaja dalam A4 Landscape dengan Scale: Fit to width.");
+  sheet.getRange("A5").setFormula(`=IFERROR(${printFormula},"Tiada rekod")`);
+  sheet.getRange("B2").setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(1, 12).build());
+  sheet.getRange("A5:K250").setWrap(true).setVerticalAlignment("middle").setFontSize(9);
+  sheet.getRange("A5:K5").setFontWeight("bold").setBackground("#0f766e").setFontColor("#ffffff");
+  sheet.setFrozenRows(5);
+  [85, 85, 105, 90, 135, 70, 110, 110, 80, 150, 90].forEach(function (width, index) {
+    sheet.setColumnWidth(index + 1, width);
+  });
+  sheet.setRowHeight(1, 34);
+  sheet.setRowHeight(5, 34);
 }
 
 function removeLegacySheets_(spreadsheet) {

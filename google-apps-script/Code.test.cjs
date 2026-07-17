@@ -35,6 +35,9 @@ class Range {
   setFormula(value) { return this.setValue(value); }
   setDataValidation(validation) { this.sheet.validations.push({ row: this.row, column: this.column, rowCount: this.rowCount, columnCount: this.columnCount, validation }); return this; }
   setHorizontalAlignment() { return this; }
+  setVerticalAlignment() { return this; }
+  setWrap() { return this; }
+  setFontSize() { return this; }
 }
 
 class Sheet {
@@ -68,6 +71,8 @@ class Sheet {
   setFrozenRows() {}
   autoResizeColumns() {}
   hideColumns() {}
+  setColumnWidth() {}
+  setRowHeight() {}
 }
 
 class Spreadsheet {
@@ -116,7 +121,7 @@ assert.ok(source.includes('DATE($L$2,${index + 1},1)'));
 assert.ok(!source.includes("starts with"));
 
 api.setupAsthmaSheets();
-assert.deepEqual([...spreadsheet.sheets.keys()], ["Asthma_Assessment", "Asthma_Monthly_View", "Asthma_Yearly_View"]);
+assert.deepEqual([...spreadsheet.sheets.keys()], ["Asthma_Assessment", "Asthma_Monthly_View", "Asthma_Yearly_View", "Asthma_Print_View"]);
 
 const base = {
   timestamp: "2026-07-16T02:30:00.000Z",
