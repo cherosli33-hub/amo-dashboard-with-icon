@@ -36,6 +36,7 @@ let sharedRecords = [];
 let formDirty = false;
 
 function endpoint() { return window.ASTHMA_CONFIG?.sheetEndpoint?.trim() || ""; }
+function requestTimeout() { return Number(window.ASTHMA_CONFIG?.requestTimeoutMs) || 15000; }
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -189,40 +190,72 @@ function makeRecord() {
   };
 }
 
-async function postRecord(record) {
-  if (!endpoint()) throw new Error("Google Sheet belum disambungkan.");
-  await fetch(endpoint(), {
-    method: "POST",
-    mode: "no-cors",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action: "saveAsthmaAssessment", record })
-  });
-}
-function jsonp(action, params = {}) {
+function sheetRequest(action, { method = "GET", record = null } = {}) {
   return new Promise((resolve, reject) => {
     if (!endpoint()) { reject(new Error("Google Sheet belum disambungkan.")); return; }
-    const callback = `__asthma_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement("script");
-    const timeout = window.setTimeout(() => cleanup(new Error("Masa sambungan tamat.")), 12000);
+    const requestId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const iframe = document.createElement("iframe");
+    iframe.hidden = true;
+    iframe.name = `asthma-sheet-${requestId}`;
+    iframe.setAttribute("aria-hidden", "true");
+    let formElement = null;
+    const timeout = window.setTimeout(() => cleanup(new Error("Masa sambungan Google Sheet tamat.")), requestTimeout());
+
     function cleanup(error, data) {
       window.clearTimeout(timeout);
-      delete window[callback];
-      script.remove();
+      window.removeEventListener("message", onMessage);
+      formElement?.remove();
+      iframe.remove();
       error ? reject(error) : resolve(data);
     }
-    window[callback] = data => cleanup(null, data);
+
+    function onMessage(event) {
+      const message = event.data;
+      if (!message || message.channel !== "amo-asthma-sheet" || message.requestId !== requestId) return;
+      try {
+        const host = new URL(event.origin).hostname;
+        if (host !== "script.google.com" && !host.endsWith(".googleusercontent.com")) return;
+      } catch { return; }
+      cleanup(null, message.payload);
+    }
+
+    window.addEventListener("message", onMessage);
+    iframe.addEventListener("error", () => cleanup(new Error("Gagal menghubungi Google Sheet.")), { once: true });
+    document.body.append(iframe);
+
     const url = new URL(endpoint());
     url.searchParams.set("action", action);
-    url.searchParams.set("callback", callback);
-    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
-    script.onerror = () => cleanup(new Error("Gagal membaca Google Sheet."));
-    script.src = url.toString();
-    document.head.append(script);
+    url.searchParams.set("transport", "iframe");
+    url.searchParams.set("requestId", requestId);
+
+    if (method === "POST") {
+      formElement = document.createElement("form");
+      formElement.hidden = true;
+      formElement.method = "POST";
+      formElement.action = url.toString();
+      formElement.target = iframe.name;
+      const payload = document.createElement("input");
+      payload.type = "hidden";
+      payload.name = "payload";
+      payload.value = JSON.stringify({ action, record });
+      formElement.append(payload);
+      document.body.append(formElement);
+      formElement.submit();
+    } else {
+      iframe.src = url.toString();
+    }
   });
 }
+
+async function postRecord(record) {
+  const response = await sheetRequest("saveAsthmaAssessment", { method: "POST", record });
+  if (!response?.ok) throw new Error(response?.error || "Rekod gagal disimpan ke Google Sheet.");
+  return response;
+}
+
 async function loadSharedRecords(showMessage = false) {
   try {
-    const response = await jsonp("listAsthmaAssessments");
+    const response = await sheetRequest("listAsthmaAssessments");
     if (!response?.ok) throw new Error(response?.error || "Gagal membaca rekod.");
     sharedRecords = Array.isArray(response.records) ? response.records : [];
     syncNotice.hidden = true;

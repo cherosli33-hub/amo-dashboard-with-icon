@@ -41,8 +41,8 @@ function setupAsthmaSheets() {
 }
 
 function doGet(e) {
+  const parameters = (e && e.parameter) || {};
   try {
-    const parameters = (e && e.parameter) || {};
     const action = String(parameters.action || "health");
     let payload;
 
@@ -54,25 +54,24 @@ function doGet(e) {
       payload = { ok: false, error: "Unsupported action" };
     }
 
-    const callback = clean_(parameters.callback);
-    return callback ? javascript_(callback, payload) : json_(payload);
+    return response_(parameters, payload);
   } catch (error) {
-    const parameters = (e && e.parameter) || {};
     const payload = { ok: false, error: String(error && error.message || error) };
-    const callback = clean_(parameters.callback);
-    return callback ? javascript_(callback, payload) : json_(payload);
+    return response_(parameters, payload);
   }
 }
 
 function doPost(e) {
+  const parameters = (e && e.parameter) || {};
   try {
-    const payload = JSON.parse((e && e.postData && e.postData.contents) || "{}");
+    const body = parameters.payload || (e && e.postData && e.postData.contents) || "{}";
+    const payload = JSON.parse(body);
     if (payload.action !== "saveAsthmaAssessment") throw new Error("Unsupported action");
     const saved = saveAsthmaAssessment_(payload.record || {});
-    return json_({ ok: true, recordId: saved.recordId, duplicate: saved.duplicate });
+    return response_(parameters, { ok: true, recordId: saved.recordId, duplicate: saved.duplicate });
   } catch (error) {
     console.error(error);
-    return json_({ ok: false, error: String(error && error.message || error) });
+    return response_(parameters, { ok: false, error: String(error && error.message || error) });
   }
 }
 
@@ -129,12 +128,14 @@ function listAsthmaAssessments_() {
     return {
       id: clean_(row[0]),
       timestamp: isoDate_(row[1]),
-      date: clean_(row[2]),
+      date: dateKey_(row[2], row[1]),
       time: clean_(row[3]),
       patientType: clean_(row[4]) === "Pediatrik" ? "paediatric" : "adult",
       patientName: clean_(row[5]), patientId: clean_(row[6]),
       age: numberOrNull_(row[7]), sex: clean_(row[8]) === "Perempuan" ? "female" : "male",
-      height: numberOrNull_(row[9]), bp: clean_(row[10]), hr: numberOrNull_(row[11]),
+      height: numberOrNull_(row[9]), bp: clean_(row[10]),
+      bpSys: splitBp_(row[10]).systolic, bpDia: splitBp_(row[10]).diastolic,
+      hr: numberOrNull_(row[11]),
       rr: numberOrNull_(row[12]), temperature: numberOrNull_(row[13]), spo2: numberOrNull_(row[14]),
       pefrIdeal: numberOrNull_(row[15]), pefrBefore: numberOrNull_(row[16]),
       percentageBefore: numberOrNull_(row[17]), categoryBefore: clean_(row[18]),
@@ -313,6 +314,17 @@ function isoDate_(value) {
   return date ? date.toISOString() : clean_(value);
 }
 
+function dateKey_(value, fallback) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  const text = clean_(value);
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return match[1] + "-" + match[2] + "-" + match[3];
+  const parsed = validDate_(text) || validDate_(fallback);
+  return parsed ? Utilities.formatDate(parsed, Session.getScriptTimeZone(), "yyyy-MM-dd") : "";
+}
+
 function numberOrBlank_(value) {
   if (value === null || value === undefined || value === "") return "";
   const number = Number(value);
@@ -333,6 +345,14 @@ function bpValue_(record) {
   return systolic !== "" && diastolic !== "" ? systolic + "/" + diastolic : "";
 }
 
+function splitBp_(value) {
+  const parts = clean_(value).split("/");
+  return {
+    systolic: numberOrNull_(parts[0]),
+    diastolic: numberOrNull_(parts[1])
+  };
+}
+
 function clean_(value) {
   return String(value === null || value === undefined ? "" : value).trim();
 }
@@ -345,4 +365,23 @@ function javascript_(callback, payload) {
   if (!/^[A-Za-z_$][0-9A-Za-z_$\.]*$/.test(callback)) throw new Error("Callback tidak sah.");
   return ContentService.createTextOutput(callback + "(" + JSON.stringify(payload) + ");")
     .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+function response_(parameters, payload) {
+  if (clean_(parameters.transport) === "iframe") {
+    return iframeResponse_(clean_(parameters.requestId), payload);
+  }
+  const callback = clean_(parameters.callback);
+  return callback ? javascript_(callback, payload) : json_(payload);
+}
+
+function iframeResponse_(requestId, payload) {
+  if (!/^[0-9A-Za-z-]{1,100}$/.test(requestId)) throw new Error("Request ID tidak sah.");
+  const message = JSON.stringify({
+    channel: "amo-asthma-sheet",
+    requestId: requestId,
+    payload: payload
+  }).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+  const html = "<!doctype html><meta charset=\"utf-8\"><script>window.top.postMessage(" + message + ",\"*\");<\/script>";
+  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }

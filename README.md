@@ -21,7 +21,7 @@ Modul Asma merangkumi:
 - Uptriage manual oleh PPP: Tiada, Yellow Zone, atau Red Zone.
 - PEFR Not Done berserta sebab daripada borang asal: Patient Refused/Uncooperative, Severe Asthma, Unable, atau Others.
 - Nama PPP wajib diisi sebelum rekod disimpan.
-- Senarai penilaian hari ini dan statistik asas pada peranti.
+- Senarai penilaian hari ini dan statistik bersama daripada Google Sheet pada semua peranti.
 - Paparan rekod harian bertukar secara automatik apabila masuk tarikh baharu; rekod lama tidak dipadam.
 - Rujukan klinikal dewasa, pediatrik, dan interpretasi PEFR.
 
@@ -32,8 +32,8 @@ Modul tidak membuat cadangan uptriage atau keputusan klinikal automatik.
 Kod backend tersedia dalam folder `google-apps-script`. Fungsi `setupAsthmaSheets()` membina tiga tab tanpa mengubah tab Dashboard A.M.O:
 
 1. `Asthma_Assessment` — satu baris bagi setiap penilaian, termasuk `Record ID`, PEFR Not Done dan `Nama PPP`.
-2. `Asthma_Dashboard` — statistik yang dikira daripada `Asthma_Assessment`.
-3. `PEFR_Reference` — jadual rujukan dewasa dan pediatrik EU/EN13826.
+2. `Asthma_Monthly_View` — paparan dan statistik bulanan daripada `Asthma_Assessment`.
+3. `Asthma_Yearly_View` — paparan dan statistik tahunan daripada `Asthma_Assessment`.
 
 ### Cara menyediakan Apps Script
 
@@ -47,7 +47,9 @@ Kod backend tersedia dalam folder `google-apps-script`. Fungsi `setupAsthmaSheet
 8. Salin URL deployment yang berakhir dengan `/exec`.
 9. Isi URL itu sebagai `sheetEndpoint` dalam `config.js`.
 
-Secara lalai, rekod disimpan dalam `localStorage` peranti. Apabila endpoint diisi, aplikasi menghantar payload berikut melalui `doPost(e)`:
+Google Sheet ialah sumber data utama. Frontend berhubung dengan Apps Script melalui jambatan iframe yang disahkan menggunakan `postMessage`, supaya bacaan dan pengesahan simpan berfungsi merentas domain tanpa bergantung pada CORS. `localStorage` hanya menyimpan rekod pending apabila penghantaran gagal; rekod pending dibuang selepas Apps Script mengesahkan simpanan berjaya.
+
+Aplikasi menghantar payload berikut melalui `doPost(e)`:
 
 ```json
 {
