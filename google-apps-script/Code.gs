@@ -201,24 +201,26 @@ function setupMonthlySheet_(spreadsheet) {
     ["Tahun", now.getFullYear()],
     ["Kod Bulan", '=TEXT(DATE(B3,B2,1),"yyyy-mm")']
   ]);
-  const prefix = '$B$4&"*"';
+  const monthStart = "DATE($B$3,$B$2,1)";
+  const monthEnd = `EDATE(${monthStart},1)`;
+  const dateCriteria = `'${source}'!C2:C,">="&${monthStart},'${source}'!C2:C,"<"&${monthEnd}`;
   const rows = [
-    ["Jumlah Penilaian", `=COUNTIF('${source}'!C2:C,${prefix})`],
-    ["Dewasa", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!E2:E,"Dewasa")`],
-    ["Pediatrik", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!E2:E,"Pediatrik")`],
-    ["Mild Before", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!S2:S,"Mild")`],
-    ["Moderate Before", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!S2:S,"Moderate")`],
-    ["Severe Before", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!S2:S,"Severe")`],
-    ["Mild After", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!V2:V,"Mild")`],
-    ["Moderate After", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!V2:V,"Moderate")`],
-    ["Severe After", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!V2:V,"Severe")`],
-    ["Uptriage Yellow", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!W2:W,"Yellow Zone")`],
-    ["Uptriage Red", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!W2:W,"Red Zone")`],
-    ["PEFR Not Done", `=COUNTIFS('${source}'!C2:C,${prefix},'${source}'!X2:X,TRUE)`]
+    ["Jumlah Penilaian", `=COUNTIFS(${dateCriteria})`],
+    ["Dewasa", `=COUNTIFS(${dateCriteria},'${source}'!E2:E,"Dewasa")`],
+    ["Pediatrik", `=COUNTIFS(${dateCriteria},'${source}'!E2:E,"Pediatrik")`],
+    ["Mild Before", `=COUNTIFS(${dateCriteria},'${source}'!S2:S,"Mild")`],
+    ["Moderate Before", `=COUNTIFS(${dateCriteria},'${source}'!S2:S,"Moderate")`],
+    ["Severe Before", `=COUNTIFS(${dateCriteria},'${source}'!S2:S,"Severe")`],
+    ["Mild After", `=COUNTIFS(${dateCriteria},'${source}'!V2:V,"Mild")`],
+    ["Moderate After", `=COUNTIFS(${dateCriteria},'${source}'!V2:V,"Moderate")`],
+    ["Severe After", `=COUNTIFS(${dateCriteria},'${source}'!V2:V,"Severe")`],
+    ["Uptriage Yellow", `=COUNTIFS(${dateCriteria},'${source}'!W2:W,"Yellow Zone")`],
+    ["Uptriage Red", `=COUNTIFS(${dateCriteria},'${source}'!W2:W,"Red Zone")`],
+    ["PEFR Not Done", `=COUNTIFS(${dateCriteria},'${source}'!X2:X,TRUE)`]
   ];
   sheet.getRange(6, 1, rows.length, 2).setValues(rows);
   sheet.getRange("D1").setValue("SENARAI REKOD BULAN DIPILIH").setFontWeight("bold");
-  sheet.getRange("D2").setFormula(`=IFERROR(QUERY('${source}'!A:AA,"select * where C starts with '"&$B$4&"'",1),"Tiada rekod")`);
+  sheet.getRange("D2").setFormula(`=IFERROR({'${source}'!A1:AA1;FILTER('${source}'!A2:AA,'${source}'!C2:C>=${monthStart},'${source}'!C2:C<${monthEnd})},"Tiada rekod")`);
   sheet.getRange("B2").setDataValidation(SpreadsheetApp.newDataValidation().requireNumberBetween(1, 12).build());
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, 5);
@@ -235,18 +237,19 @@ function setupYearlySheet_(spreadsheet) {
   sheet.getRange("K1:L1").setFontWeight("bold").setBackground("#0f766e").setFontColor("#ffffff");
   const months = ["Januari", "Februari", "Mac", "April", "Mei", "Jun", "Julai", "Ogos", "September", "Oktober", "November", "Disember"];
   const formulas = months.map(function (month, index) {
-    const row = index + 2;
-    const prefix = `TEXT(DATE($L$2,${index + 1},1),"yyyy-mm")&"*"`;
+    const monthStart = `DATE($L$2,${index + 1},1)`;
+    const monthEnd = `EDATE(${monthStart},1)`;
+    const dateCriteria = `'${source}'!C:C,">="&${monthStart},'${source}'!C:C,"<"&${monthEnd}`;
     return [
       month,
-      `=COUNTIF('${source}'!C:C,${prefix})`,
-      `=COUNTIFS('${source}'!C:C,${prefix},'${source}'!E:E,"Dewasa")`,
-      `=COUNTIFS('${source}'!C:C,${prefix},'${source}'!E:E,"Pediatrik")`,
-      `=COUNTIFS('${source}'!C:C,${prefix},'${source}'!V:V,"Mild")`,
-      `=COUNTIFS('${source}'!C:C,${prefix},'${source}'!V:V,"Moderate")`,
-      `=COUNTIFS('${source}'!C:C,${prefix},'${source}'!V:V,"Severe")`,
-      `=COUNTIFS('${source}'!C:C,${prefix},'${source}'!W:W,"Yellow Zone")`,
-      `=COUNTIFS('${source}'!C:C,${prefix},'${source}'!W:W,"Red Zone")`
+      `=COUNTIFS(${dateCriteria})`,
+      `=COUNTIFS(${dateCriteria},'${source}'!E:E,"Dewasa")`,
+      `=COUNTIFS(${dateCriteria},'${source}'!E:E,"Pediatrik")`,
+      `=COUNTIFS(${dateCriteria},'${source}'!V:V,"Mild")`,
+      `=COUNTIFS(${dateCriteria},'${source}'!V:V,"Moderate")`,
+      `=COUNTIFS(${dateCriteria},'${source}'!V:V,"Severe")`,
+      `=COUNTIFS(${dateCriteria},'${source}'!W:W,"Yellow Zone")`,
+      `=COUNTIFS(${dateCriteria},'${source}'!W:W,"Red Zone")`
     ];
   });
   sheet.getRange(2, 1, formulas.length, formulas[0].length).setValues(formulas);

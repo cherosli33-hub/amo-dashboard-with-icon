@@ -108,6 +108,11 @@ const source = fs.readFileSync(path.join(__dirname, "Code.gs"), "utf8") +
 vm.runInNewContext(source, context);
 const api = context.__api;
 
+assert.ok(source.includes('const monthStart = "DATE($B$3,$B$2,1)"'));
+assert.ok(source.includes("FILTER('${source}'!A2:AA"));
+assert.ok(source.includes('DATE($L$2,${index + 1},1)'));
+assert.ok(!source.includes("starts with"));
+
 api.setupAsthmaSheets();
 assert.deepEqual([...spreadsheet.sheets.keys()], ["Asthma_Assessment", "Asthma_Monthly_View", "Asthma_Yearly_View"]);
 
