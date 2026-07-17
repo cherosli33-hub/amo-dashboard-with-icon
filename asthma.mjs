@@ -34,6 +34,7 @@ let assessmentTime = new Date();
 let state = { ideal: null, beforePercentage: null, afterPercentage: null };
 let sharedRecords = [];
 let formDirty = false;
+let pendingSyncPromise = null;
 
 function endpoint() { return window.ASTHMA_CONFIG?.sheetEndpoint?.trim() || ""; }
 function requestTimeout() { return Number(window.ASTHMA_CONFIG?.requestTimeoutMs) || 15000; }
@@ -151,7 +152,7 @@ function getPending() {
   catch { return []; }
 }
 function setPending(records) { localStorage.setItem(PENDING_KEY, JSON.stringify(records)); }
-function addPending(record) { const records = getPending().filter(item => item.id !== record.id); records.push(record); setPending(records); }
+function addPending(record) { const records = getPending().filter(item => item.id !== record.id); records.push({ ...record, syncStatus: "pending" }); setPending(records); }
 function removePending(id) { setPending(getPending().filter(item => item.id !== id)); }
 
 function makeRecord() {
@@ -271,11 +272,29 @@ async function loadSharedRecords(showMessage = false) {
   }
 }
 async function retryPending() {
-  if (!endpoint() || !navigator.onLine) return;
-  for (const record of getPending()) {
-    try { await postRecord(record); removePending(record.id); }
-    catch { break; }
-  }
+  if (!endpoint() || !navigator.onLine) return 0;
+  if (pendingSyncPromise) return pendingSyncPromise;
+  pendingSyncPromise = (async () => {
+    let synced = 0;
+    for (const record of getPending()) {
+      try {
+        await postRecord(record);
+        removePending(record.id);
+        if (!sharedRecords.some(item => item.id === record.id)) sharedRecords.push({ ...record, syncStatus: "submitted" });
+        synced += 1;
+      } catch { break; }
+    }
+    renderRecords();
+    renderStats();
+    return synced;
+  })().finally(() => { pendingSyncPromise = null; });
+  return pendingSyncPromise;
+}
+async function syncPendingInBackground({ notify = true } = {}) {
+  const synced = await retryPending();
+  if (!synced) return;
+  await loadSharedRecords();
+  if (notify) showToast(synced === 1 ? "Rekod berjaya disegerakkan ke Google Sheet." : `${synced} rekod berjaya disegerakkan ke Google Sheet.`);
 }
 
 function showToast(message) {
@@ -300,7 +319,7 @@ function categoryBadge(category, percentage) {
 }
 function currentRecords() {
   const merged = [...sharedRecords];
-  getPending().forEach(record => { if (!merged.some(item => item.id === record.id)) merged.push(record); });
+  getPending().forEach(record => { if (!merged.some(item => item.id === record.id)) merged.push({ ...record, syncStatus: "pending" }); });
   return merged;
 }
 function renderRecords() {
@@ -309,10 +328,11 @@ function renderRecords() {
   const records = currentRecords().filter(record => record.date === localDateKey()).filter(record => !query || String(record.patientId).toLowerCase().includes(query)).sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
   if (!records.length) { list.innerHTML = '<div class="empty-state">Tiada rekod penilaian untuk dipaparkan.</div>'; return; }
   list.innerHTML = records.map(record => {
+    const syncLabel = record.syncStatus === "pending" ? '<span class="pending-label">Menunggu sync</span>' : "";
     const flow = record.pefrNotDone
       ? `<div class="record-flow"><div><b>PEFR Not Done</b>${categoryBadge("Not Done", null)}</div><span class="arrow">·</span><div><b>Sebab</b><small>${escapeHtml(record.notDoneReason || "Tidak dinyatakan")}</small></div></div>`
       : `<div class="record-flow"><div><b>Before · ${record.pefrBefore} L/min</b>${categoryBadge(record.categoryBefore, record.percentageBefore)}</div><span class="arrow">→</span><div><b>After · ${record.pefrAfter} L/min</b>${categoryBadge(record.categoryAfter, record.percentageAfter)}</div></div>`;
-    return `<article class="record-card"><div class="record-top"><strong>${escapeHtml(record.patientId)}</strong><small>${escapeHtml(record.time)}</small></div>${flow}<div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}${record.pefrIdeal ? ` · Ideal ${record.pefrIdeal} L/min` : ""}</span><span>PPP: ${escapeHtml(record.pppName || "—")} · Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div></article>`;
+    return `<article class="record-card"><div class="record-top"><strong>${escapeHtml(record.patientId)}</strong><small>${escapeHtml(record.time)} ${syncLabel}</small></div>${flow}<div class="record-footer"><span>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}${record.pefrIdeal ? ` · Ideal ${record.pefrIdeal} L/min` : ""}</span><span>PPP: ${escapeHtml(record.pppName || "—")} · Uptriage: ${record.uptriage === "None" ? "Tiada" : escapeHtml(record.uptriage)}</span></div></article>`;
   }).join("");
 }
 function startOfWeek(date) { const result = new Date(date); const day = (result.getDay() + 6) % 7; result.setHours(0, 0, 0, 0); result.setDate(result.getDate() - day); return result; }
@@ -357,23 +377,22 @@ form.addEventListener("change", event => {
   if (event.target.name === "uptriage") renderSummary();
   if (event.target.name === "pefrNotDone" || event.target.name === "notDoneReason") updateNotDoneMode();
 });
-form.addEventListener("submit", async event => {
+form.addEventListener("submit", event => {
   event.preventDefault();
   const validAssessment = isPefrNotDone() ? Boolean(selectedNotDoneReason()) : Boolean(state.ideal && state.beforePercentage !== null && state.afterPercentage !== null);
   if (!form.reportValidity() || !validAssessment) { showToast("Lengkapkan semua maklumat wajib dan bacaan PEFR."); return; }
-  const saveButton = document.querySelector("#saveButton");
   const record = makeRecord();
-  saveButton.disabled = true;
-  addPending(record);
   try {
-    await postRecord(record);
-    removePending(record.id);
-    showToast("Rekod dihantar ke Google Sheet.");
-    resetForm();
-    window.setTimeout(() => loadSharedRecords(), 1200);
+    addPending(record);
   } catch {
-    showToast("Internet/Google Sheet gagal. Rekod disimpan sementara dalam telefon dan akan dicuba semula.");
-  } finally { saveButton.disabled = false; }
+    showToast("Rekod tidak dapat disimpan dalam telefon. Sila cuba semula.");
+    return;
+  }
+  renderRecords();
+  renderStats();
+  resetForm();
+  showToast("Rekod disimpan. Penyegerakan ke Google Sheet berjalan di belakang.");
+  void syncPendingInBackground();
 });
 
 document.querySelector("#resetButton").addEventListener("click", resetForm);
@@ -382,7 +401,9 @@ document.querySelector("#refreshRecords").addEventListener("click", () => loadSh
 document.querySelector("#refreshStats").addEventListener("click", () => loadSharedRecords(true));
 document.querySelector("#statsRange").addEventListener("change", renderStats);
 document.querySelectorAll(".nav-button").forEach(button => button.addEventListener("click", () => setView(button.dataset.view)));
-window.addEventListener("online", async () => { await retryPending(); await loadSharedRecords(); });
+window.addEventListener("online", () => { void syncPendingInBackground(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) void syncPendingInBackground({ notify: false }); });
+window.setInterval(() => { if (getPending().length) void syncPendingInBackground({ notify: false }); }, 30000);
 
 const referenceDialog = document.querySelector("#referenceDialog");
 document.querySelectorAll(".reference-card").forEach(button => button.addEventListener("click", () => {
@@ -399,5 +420,5 @@ setAssessmentTime();
 syncNotice.hidden = Boolean(endpoint());
 if (!endpoint()) { syncNotice.hidden = false; syncNotice.textContent = "Google Sheet belum disambungkan. Rekod hanya boleh disimpan sementara pada peranti ini."; }
 updateNotDoneMode();
-retryPending().then(loadSharedRecords);
+syncPendingInBackground({ notify: false }).then(() => loadSharedRecords());
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");

@@ -47,7 +47,7 @@ Kod backend tersedia dalam folder `google-apps-script`. Fungsi `setupAsthmaSheet
 8. Salin URL deployment yang berakhir dengan `/exec`.
 9. Isi URL itu sebagai `sheetEndpoint` dalam `config.js`.
 
-Google Sheet ialah sumber data utama. Frontend berhubung dengan Apps Script melalui jambatan iframe yang disahkan menggunakan `postMessage`, supaya bacaan dan pengesahan simpan berfungsi merentas domain tanpa bergantung pada CORS. `localStorage` hanya menyimpan rekod pending apabila penghantaran gagal; rekod pending dibuang selepas Apps Script mengesahkan simpanan berjaya.
+Google Sheet ialah sumber data bersama. Apabila pengguna menekan Simpan, rekod dimasukkan serta-merta ke `localStorage` sebagai pending supaya borang tidak perlu menunggu rangkaian. Frontend kemudian menyegerakkan rekod ke Apps Script di belakang melalui jambatan iframe yang disahkan menggunakan `postMessage`. Rekod pending dibuang hanya selepas Apps Script mengesahkan simpanan berjaya; percubaan semula berlaku ketika aplikasi dibuka, internet kembali, aplikasi kembali aktif, dan setiap 30 saat selagi masih ada rekod pending.
 
 Aplikasi menghantar payload berikut melalui `doPost(e)`:
 
