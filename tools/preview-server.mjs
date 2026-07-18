@@ -4,6 +4,7 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const port = Number(process.env.PORT || 4173);
+const host = process.env.HOST || "127.0.0.1";
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -25,7 +26,6 @@ http.createServer((request, response) => {
   }
   response.writeHead(200, { "Content-Type": types[path.extname(file).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
   fs.createReadStream(file).pipe(response);
-}).listen(port, "127.0.0.1", () => {
-  console.log(`AMO migration preview: http://127.0.0.1:${port}/amo.html`);
+}).listen(port, host, () => {
+  console.log(`AMO migration preview: http://${host}:${port}/amo.html`);
 });
-
