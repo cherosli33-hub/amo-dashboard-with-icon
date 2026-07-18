@@ -1,4 +1,4 @@
-const CACHE = "amo-etd-lepeh-v14-amo-migration";
+const CACHE = "amo-etd-lepeh-v15-amo-production";
 const ASSETS = [
   "./",
   "./index.html",

@@ -26,6 +26,7 @@ await context.addInitScript(() => {
 const page = await context.newPage();
 const errors = [];
 const productionPosts = [];
+let postedPayload = null;
 page.on("console", message => {
   if (message.type() === "error") errors.push(message.text());
 });
@@ -37,6 +38,16 @@ page.on("request", request => {
 });
 await page.route("**/exec*", async route => {
   const request = route.request();
+  if (request.method() === "POST") {
+    postedPayload = JSON.parse(request.postData() || "{}");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify({ result: "success", refresh: { status: "updated" } })
+    });
+    return;
+  }
   if (request.method() === "GET" && request.url().includes("action=data")) {
     await new Promise(resolve => setTimeout(resolve, 2200));
   }
@@ -74,9 +85,12 @@ await page.getByRole("button", { name: "Yellow Zone" }).click();
 await page.getByPlaceholder(/Masukkan ID Pesakit/).fill("TEST-MIGRATION-LOCAL");
 await page.getByRole("button", { name: "Dressing" }).click();
 await page.getByRole("button", { name: /Simpan kes/ }).click();
-await page.getByText("Mod ujian: tiada data dihantar ke Google Sheet", { exact: true }).waitFor();
+await page.getByText("Sync ke Google Sheet selesai", { exact: true }).waitFor();
 
-if (productionPosts.length) throw new Error("Read-only preview attempted a production POST.");
+if (productionPosts.length !== 1) throw new Error(`Expected one intercepted production POST, received ${productionPosts.length}.`);
+if (postedPayload?.patientId !== "TEST-MIGRATION-LOCAL" || postedPayload?.procedures?.[0]?.name !== "Dressing") {
+  throw new Error(`Unexpected save payload: ${JSON.stringify(postedPayload)}`);
+}
 if (errors.length) throw new Error(`Browser errors: ${errors.join(" | ")}`);
 
 await page.screenshot({ path: "artifacts/amo-flow-mobile.png", fullPage: true });
@@ -86,5 +100,5 @@ console.log("PASS: shared production data endpoint can be read from the GitHub-s
 console.log(`PASS: cached dashboard rendered first in ${firstPaintMs}ms, then refreshed from Sheet.`);
 console.log("PASS: mobile + button remains visible without scrolling.");
 console.log("PASS: shift, zone, patient ID, procedure and save flow work on a mobile viewport.");
-console.log("PASS: migration preview performed zero production writes.");
+console.log("PASS: production save payload is correct; the test POST was intercepted before reaching Sheet.");
 console.log("PASS: mobile layout has no horizontal overflow.");

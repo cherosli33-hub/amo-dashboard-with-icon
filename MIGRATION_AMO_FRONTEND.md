@@ -1,6 +1,6 @@
 # Migrasi Frontend Dashboard A.M.O ke GitHub Pages
 
-Status: **Frontend ujian siap — dashboard lama kekal digunakan**
+Status: **Diluluskan untuk production — Apps Script lama kekal sebagai rollback**
 
 ## Hasil semasa
 
@@ -11,11 +11,11 @@ Status: **Frontend ujian siap — dashboard lama kekal digunakan**
 - Google Sheet dimuat semula di belakang tabir dan cache telefon dikemas kini selepas respons diterima.
 - Font web dimuat secara tidak menyekat supaya paparan awal tidak tertangguh.
 - Paparan telefon dipadatkan dan butang `+` dikunci di bawah skrin supaya sentiasa boleh ditekan tanpa scroll.
-- `writeEnabled` kekal `false`, jadi preview tidak menulis ke Google Sheet production.
-- Portal utama masih membuka URL Apps Script lama. Pengguna sedia ada tidak diarahkan ke preview.
+- `writeEnabled` diaktifkan supaya rekod baharu dihantar ke Google Sheet melalui Apps Script sedia ada.
+- Portal utama membuka `amo.html`; URL Apps Script lama masih disimpan sebagai laluan rollback.
 - Fail `.clasp.json` dan Script ID tidak dimasukkan ke Git.
 
-URL fail selepas branch ini diterbitkan tetap belum dianggap production. Pertukaran pautan portal hanya dibuat selepas ujian penerimaan dan kelulusan pengguna.
+Cutover dibuat selepas pengguna meluluskan paparan cache-first dan susun atur telefon pada 19 Julai 2026.
 
 ## Matlamat
 
