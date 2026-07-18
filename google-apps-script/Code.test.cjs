@@ -31,12 +31,20 @@ class Range {
   setFontColor() { return this; }
   setNumberFormat() { return this; }
   merge() { return this; }
+  createFilter() { this.sheet.filter = true; return this; }
+  setFormula(value) { return this.setValue(value); }
+  setDataValidation(validation) { this.sheet.validations.push({ row: this.row, column: this.column, rowCount: this.rowCount, columnCount: this.columnCount, validation }); return this; }
+  setHorizontalAlignment() { return this; }
+  setVerticalAlignment() { return this; }
+  setWrap() { return this; }
+  setFontSize() { return this; }
 }
 
 class Sheet {
   constructor(name) {
     this.name = name;
     this.rows = [];
+    this.validations = [];
   }
   getName() { return this.name; }
   getLastRow() {
@@ -55,9 +63,16 @@ class Sheet {
     this.rows[row - 1][column - 1] = value;
   }
   appendRow(row) { this.rows.push([...row]); }
+  insertRowsAfter(afterPosition, howMany) { this.rows.splice(afterPosition, 0, ...Array.from({ length: howMany }, () => [])); }
   deleteColumn(column) { this.rows.forEach(row => row.splice(column - 1, 1)); }
+  clear() { this.rows = []; this.filter = false; }
+  getFilter() { return this.filter ? {} : null; }
+  getMaxRows() { return Math.max(this.rows.length, 1000); }
   setFrozenRows() {}
   autoResizeColumns() {}
+  hideColumns() {}
+  setColumnWidth() {}
+  setRowHeight() {}
 }
 
 class Spreadsheet {
@@ -69,28 +84,44 @@ class Spreadsheet {
     this.sheets.set(name, sheet);
     return sheet;
   }
+  getSheets() { return [...this.sheets.values()]; }
+  deleteSheet(sheet) { this.sheets.delete(sheet.getName()); }
 }
 
 const spreadsheet = new Spreadsheet();
 const context = {
   console,
-  SpreadsheetApp: { getActiveSpreadsheet: () => spreadsheet, openById: () => spreadsheet },
+  SpreadsheetApp: {
+    getActiveSpreadsheet: () => spreadsheet,
+    openById: () => spreadsheet,
+    flush() {},
+    newDataValidation: () => ({ requireNumberBetween() { return this; }, requireCheckbox() { this.checkbox = true; return this; }, build() { return { checkbox: Boolean(this.checkbox) }; } })
+  },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
-  Utilities: { formatDate: date => date.toISOString().slice(0, 10).replaceAll("-", "") },
+  Utilities: { formatDate: (date, _zone, pattern) => pattern === "yyyyMMdd" ? date.toISOString().slice(0, 10).replaceAll("-", "") : date.toISOString().slice(0, 10) },
   Session: { getScriptTimeZone: () => "Asia/Kuala_Lumpur" },
   ContentService: {
-    MimeType: { JSON: "json" },
+    MimeType: { JSON: "json", JAVASCRIPT: "javascript" },
     createTextOutput: text => ({ text, setMimeType() { return this; } })
+  },
+  HtmlService: {
+    XFrameOptionsMode: { ALLOWALL: "ALLOWALL" },
+    createHtmlOutput: html => ({ html, setXFrameOptionsMode() { return this; } })
   }
 };
 
 const source = fs.readFileSync(path.join(__dirname, "Code.gs"), "utf8") +
-  "\n;globalThis.__api={setupAsthmaSheets,saveAsthmaAssessment_,migrateSplitBpColumns_,doPost};";
+  "\n;globalThis.__api={setupAsthmaSheets,saveAsthmaAssessment_,listAsthmaAssessments_,migrateSplitBpColumns_,dateKey_,doGet,doPost};";
 vm.runInNewContext(source, context);
 const api = context.__api;
 
+assert.ok(source.includes('const monthStart = "DATE($B$3,$B$2,1)"'));
+assert.ok(source.includes("FILTER('${source}'!A2:AA"));
+assert.ok(source.includes('DATE($L$2,${index + 1},1)'));
+assert.ok(!source.includes("starts with"));
+
 api.setupAsthmaSheets();
-assert.deepEqual([...spreadsheet.sheets.keys()], ["Asthma_Assessment", "Asthma_Dashboard", "PEFR_Reference"]);
+assert.deepEqual([...spreadsheet.sheets.keys()], ["Asthma_Assessment", "Asthma_Monthly_View", "Asthma_Yearly_View", "Asthma_Print_View"]);
 
 const base = {
   timestamp: "2026-07-16T02:30:00.000Z",
@@ -134,8 +165,8 @@ api.saveAsthmaAssessment_({
 const assessment = spreadsheet.getSheetByName("Asthma_Assessment");
 assert.equal(assessment.rows[0].length, 27);
 assert.equal(assessment.rows[1].length, 27);
-assert.match(assessment.rows[1][0], /^AST-20260716-001$/);
-assert.match(assessment.rows[2][0], /^AST-20260716-002$/);
+assert.match(assessment.rows[1][0], /^AST-\d{8}-001$/);
+assert.match(assessment.rows[2][0], /^AST-\d{8}-002$/);
 assert.equal(assessment.rows[1][10], "120/80");
 assert.equal(assessment.rows[1][26], "PPP Rosli");
 assert.equal(assessment.rows[2][26], "PPP Aminah");
@@ -143,13 +174,28 @@ assert.equal(assessment.rows[2][4], "Pediatrik");
 assert.equal(assessment.rows[2][16], "");
 assert.equal(assessment.rows[2][23], true);
 assert.equal(assessment.rows[2][24], "Unable");
+assert.ok(assessment.validations.some(item => item.column === 24 && item.validation.checkbox));
 
-const dashboard = spreadsheet.getSheetByName("Asthma_Dashboard");
-assert.match(dashboard.rows[1][1], /COUNTA/);
-assert.match(dashboard.rows[12][1], /X2:X,TRUE/);
+assessment.rows[1][2] = new Date("2026-07-16T07:00:00.000Z");
+const listed = api.listAsthmaAssessments_();
+assert.equal(listed[0].date, "2026-07-16");
+assert.equal(listed[0].bpSys, 120);
+assert.equal(listed[0].bpDia, 80);
+assert.equal(api.dateKey_("Thu Jul 16 2026 15:00:00 GMT+0800", base.timestamp), "2026-07-16");
 
-const reference = spreadsheet.getSheetByName("PEFR_Reference");
-assert.ok(reference.rows.some(row => row[0] === 130 && row[1] === 212));
+const iframeGet = api.doGet({ parameter: { action: "listAsthmaAssessments", transport: "iframe", requestId: "request-123" } });
+assert.match(iframeGet.html, /window\.top\.postMessage/);
+assert.match(iframeGet.html, /amo-asthma-sheet/);
+assert.match(iframeGet.html, /request-123/);
+
+const iframePost = api.doPost({
+  parameter: {
+    transport: "iframe",
+    requestId: "request-456",
+    payload: JSON.stringify({ action: "saveAsthmaAssessment", record: { ...base, id: "browser-record-1", patientId: "RN-003" } })
+  }
+});
+assert.match(iframePost.html, /browser-record-1/);
 
 const legacy = new Sheet("Legacy_Assessment");
 const legacyHeaders = [...assessment.rows[0].slice(0, 10), "BP Systolic", "BP Diastolic", ...assessment.rows[0].slice(11)];
@@ -168,5 +214,7 @@ console.log(JSON.stringify({
   bp: assessment.rows[1][10],
   normalPpp: assessment.rows[1][26],
   notDonePpp: assessment.rows[2][26],
-  migratedBp: legacy.rows[1][10]
+  migratedBp: legacy.rows[1][10],
+  normalizedDate: listed[0].date,
+  iframeTransport: true
 }));
