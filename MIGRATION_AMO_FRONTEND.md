@@ -7,6 +7,9 @@ Status: **Frontend ujian siap — dashboard lama kekal digunakan**
 - `amo.html` dijana terus daripada `DASHBOARD_HTML` yang digunakan oleh deployment production.
 - Reka bentuk, label, susunan, aliran shift/zon/ID pesakit/prosedur dan carta dikekalkan.
 - `amo-config.js` menggunakan endpoint Apps Script sedia ada untuk bacaan data.
+- Dashboard terus dipaparkan daripada cache `localStorage`; ia tidak menunggu Google Sheet sebelum membuka aplikasi.
+- Google Sheet dimuat semula di belakang tabir dan cache telefon dikemas kini selepas respons diterima.
+- Font web dimuat secara tidak menyekat supaya paparan awal tidak tertangguh.
 - `writeEnabled` kekal `false`, jadi preview tidak menulis ke Google Sheet production.
 - Portal utama masih membuka URL Apps Script lama. Pengguna sedia ada tidak diarahkan ke preview.
 - Fail `.clasp.json` dan Script ID tidak dimasukkan ke Git.
@@ -50,8 +53,8 @@ Tanpa kod sumber ini, reka bentuk tidak boleh disalin 100% dengan selamat hanya 
 
 - Gunakan endpoint `?action=data` sedia ada untuk bacaan
 - Kekalkan penghantaran data dimatikan dalam preview
-- Muat data hari ini dahulu
-- Muat statistik dan carta sejarah selepas paparan utama muncul
+- Paparkan cache telefon dahulu, kemudian muat data Sheet harian dan trend 7 hari di belakang tabir
+- Kemas kini statistik dan carta selepas data Sheet diterima tanpa menutup skrin dashboard
 - Kekalkan payload dan struktur Google Sheet sedia ada
 
 ### Fasa 3 — Ujian selari
