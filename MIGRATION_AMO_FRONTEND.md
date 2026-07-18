@@ -1,6 +1,17 @@
 # Migrasi Frontend Dashboard A.M.O ke GitHub Pages
 
-Status: **Persediaan selamat — dashboard lama kekal digunakan**
+Status: **Frontend ujian siap — dashboard lama kekal digunakan**
+
+## Hasil semasa
+
+- `amo.html` dijana terus daripada `DASHBOARD_HTML` yang digunakan oleh deployment production.
+- Reka bentuk, label, susunan, aliran shift/zon/ID pesakit/prosedur dan carta dikekalkan.
+- `amo-config.js` menggunakan endpoint Apps Script sedia ada untuk bacaan data.
+- `writeEnabled` kekal `false`, jadi preview tidak menulis ke Google Sheet production.
+- Portal utama masih membuka URL Apps Script lama. Pengguna sedia ada tidak diarahkan ke preview.
+- Fail `.clasp.json` dan Script ID tidak dimasukkan ke Git.
+
+URL fail selepas branch ini diterbitkan tetap belum dianggap production. Pertukaran pautan portal hanya dibuat selepas ujian penerimaan dan kelulusan pengguna.
 
 ## Matlamat
 
@@ -28,16 +39,17 @@ Tanpa kod sumber ini, reka bentuk tidak boleh disalin 100% dengan selamat hanya 
 
 ## Pelan pelaksanaan
 
-### Fasa 1 — Salinan visual
+### Fasa 1 — Salinan visual ✅
 
-- Cipta `amo.html`
+- Cipta `amo.html` daripada HTML production yang tertanam dalam `Code.js`
 - Salin HTML/CSS/JavaScript asal tanpa mengubah reka bentuk
 - Kekalkan semua label, butang, susunan dan aliran kerja
 - Belum sambung ke data produksi
 
-### Fasa 2 — Backend API
+### Fasa 2 — Sambungan API preview ✅
 
-- Pisahkan fungsi Apps Script kepada endpoint baca dan simpan
+- Gunakan endpoint `?action=data` sedia ada untuk bacaan
+- Kekalkan penghantaran data dimatikan dalam preview
 - Muat data hari ini dahulu
 - Muat statistik dan carta sejarah selepas paparan utama muncul
 - Kekalkan payload dan struktur Google Sheet sedia ada
@@ -57,3 +69,23 @@ Tanpa kod sumber ini, reka bentuk tidak boleh disalin 100% dengan selamat hanya 
 - Tukar butang portal kepada `./amo.html` hanya selepas kelulusan
 - Kekalkan URL Apps Script lama sebagai pautan backup sementara
 - Pantau penyimpanan data sebelum menutup versi lama
+
+## Cara mengesahkan migration
+
+Jalankan:
+
+```text
+node tools/verify-amo-migration.mjs
+```
+
+Pemeriksaan ini memastikan hanya sambungan konfigurasi dan sekatan tulis preview ditambah kepada HTML asal, portal production belum ditukar, dan Script ID tidak dijejak Git.
+
+## Mengaktifkan penulisan selepas kelulusan
+
+Jangan aktifkan semasa fasa preview. Selepas ujian bacaan, paparan dan aliran borang lulus:
+
+1. Uji penghantaran dahulu menggunakan salinan Sheet atau rekod ujian yang dipersetujui.
+2. Tukar `writeEnabled` kepada `true` pada branch ujian sahaja.
+3. Sahkan satu rekod menghasilkan bilangan baris prosedur yang betul.
+4. Barulah tukar pautan portal daripada Apps Script lama kepada `./amo.html`.
+5. URL Apps Script lama kekal sebagai laluan rollback.
