@@ -10,6 +10,7 @@ Status: **Frontend ujian siap — dashboard lama kekal digunakan**
 - Dashboard terus dipaparkan daripada cache `localStorage`; ia tidak menunggu Google Sheet sebelum membuka aplikasi.
 - Google Sheet dimuat semula di belakang tabir dan cache telefon dikemas kini selepas respons diterima.
 - Font web dimuat secara tidak menyekat supaya paparan awal tidak tertangguh.
+- Paparan telefon dipadatkan dan butang `+` dikunci di bawah skrin supaya sentiasa boleh ditekan tanpa scroll.
 - `writeEnabled` kekal `false`, jadi preview tidak menulis ke Google Sheet production.
 - Portal utama masih membuka URL Apps Script lama. Pengguna sedia ada tidak diarahkan ke preview.
 - Fail `.clasp.json` dan Script ID tidak dimasukkan ke Git.

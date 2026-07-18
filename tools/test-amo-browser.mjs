@@ -51,6 +51,13 @@ const firstPaintMs = Date.now() - startedAt;
 const cachedCount = (await page.locator(".ring-center .num").textContent())?.trim();
 if (cachedCount !== "1") throw new Error(`Cached dashboard did not render first; count was ${cachedCount}.`);
 if (firstPaintMs > 1500) throw new Error(`Cached first paint took ${firstPaintMs}ms.`);
+const fabPosition = await page.locator("#fab").evaluate(element => {
+  const box = element.getBoundingClientRect();
+  return { position: getComputedStyle(element).position, top: box.top, bottom: box.bottom, viewport: window.innerHeight };
+});
+if (fabPosition.position !== "fixed" || fabPosition.top < 0 || fabPosition.bottom > fabPosition.viewport) {
+  throw new Error(`Mobile + button is not fixed inside the initial viewport: ${JSON.stringify(fabPosition)}`);
+}
 await page.waitForFunction(() => {
   const cache = localStorage.getItem("amo-procedure-cases-v1") || "";
   return !cache.includes("cached-first-paint");
@@ -77,6 +84,7 @@ await browser.close();
 
 console.log("PASS: shared production data endpoint can be read from the GitHub-style frontend.");
 console.log(`PASS: cached dashboard rendered first in ${firstPaintMs}ms, then refreshed from Sheet.`);
+console.log("PASS: mobile + button remains visible without scrolling.");
 console.log("PASS: shift, zone, patient ID, procedure and save flow work on a mobile viewport.");
 console.log("PASS: migration preview performed zero production writes.");
 console.log("PASS: mobile layout has no horizontal overflow.");

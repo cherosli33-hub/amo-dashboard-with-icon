@@ -32,6 +32,41 @@ export function migrateHtml(productionHtml) {
     '<link href="$1" rel="stylesheet" media="print" onload="this.media=\'all\'">\n<noscript><link href="$1" rel="stylesheet"></noscript>',
     "Google Fonts stylesheet"
   );
+  const compactMobileStyles = `
+<style id="amo-mobile-compact">
+@media (max-width:520px){
+  body{padding-bottom:calc(92px + env(safe-area-inset-bottom));}
+  .wrap{padding:14px 12px 10px;}
+  .header{margin-bottom:16px;}
+  .header .date{font-size:10px; letter-spacing:.14em;}
+  .header h1{font-size:21px; line-height:1.12;}
+  .header .icon{width:42px; height:42px;}
+  .ring-card{padding:12px 10px; margin-bottom:18px;}
+  .ring-row{gap:8px;}
+  .ring-box,.ring-box>svg{width:150px; height:150px;}
+  .ring-center .num{font-size:30px;}
+  .ring-center .lbl{font-size:9px;}
+  .ring-legend{gap:9px;}
+  .ring-legend-row .label,.ring-legend-row .count{font-size:14px;}
+  .ring-legend-row .now-tag{font-size:9px;}
+  .section{margin-bottom:18px;}
+  .section h2{font-size:13px; margin-bottom:10px;}
+  .bar-row{margin-bottom:10px;}
+  .bar-top .name,.bar-top .count{font-size:14px;}
+  .bar-track{height:6px;}
+  .trend-chart{height:126px; gap:6px;}
+  .trend-count{font-size:10px; height:12px;}
+  .trend-label{font-size:11px;}
+  .fab{position:fixed; left:50%; bottom:calc(14px + env(safe-area-inset-bottom)); width:68px; height:68px; margin:0; transform:translateX(-50%); z-index:45;}
+  .fab:active{transform:translateX(-50%) scale(.95);}
+  .fab svg{width:34px; height:34px;}
+}
+@media (max-width:380px){
+  .ring-box,.ring-box>svg{width:142px; height:142px;}
+  .ring-legend-row .label,.ring-legend-row .count{font-size:13px;}
+}
+</style>`;
+  replaceRequired("</style>", `</style>\n${compactMobileStyles}`, "production styles");
 
   // First paint must never wait for Google Sheet.
   replaceRequired(
