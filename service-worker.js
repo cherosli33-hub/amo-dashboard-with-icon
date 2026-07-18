@@ -1,8 +1,10 @@
-const CACHE = "amo-etd-lepeh-v13";
+const CACHE = "amo-etd-lepeh-v15-amo-production";
 const ASSETS = [
   "./",
   "./index.html",
   "./asthma.html",
+  "./amo.html",
+  "./amo-config.js",
   "./styles.css?v=5",
   "./config.js?v=7",
   "./pefr.mjs",
