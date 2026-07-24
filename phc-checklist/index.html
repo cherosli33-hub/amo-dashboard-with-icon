@@ -9,11 +9,23 @@
   <link rel="icon" href="assets/icon192.png">
   <link rel="stylesheet" href="css/style.css?v=2.6.0">
   <title>PHC Checklist — Hospital Kuala Lipis</title>
+  <style>
+    /* Butang kembali ke portal A.M.O ETD LEPEH (hanya dalam salinan portal) */
+    .topbar-lead{display:flex;align-items:center;gap:10px;min-width:0}
+    .portal-back{flex:0 0 auto;font-size:24px;line-height:1}
+    @media(max-width:380px){
+      .portal-back{width:38px;height:38px;font-size:21px}
+      .topbar-lead{gap:7px}
+    }
+  </style>
 </head>
 <body data-page="dashboard">
   <div class="app-shell">
     <header class="topbar">
-      <div class="brand-lockup"><img src="assets/logo.png" alt="Logo PHC Hospital Kuala Lipis"><div><small>E.T.D HOSPITAL KUALA LIPIS</small><strong>PHC Checklist</strong></div></div>
+      <div class="topbar-lead">
+        <a class="icon-button portal-back" href="../" aria-label="Kembali ke menu utama">‹</a>
+        <div class="brand-lockup"><img src="assets/logo.png" alt="Logo PHC Hospital Kuala Lipis"><div><small>E.T.D HOSPITAL KUALA LIPIS</small><strong>PHC Checklist</strong></div></div>
+      </div>
       <a class="icon-button" href="settings.html" aria-label="Buka tetapan">⚙</a>
     </header>
     <main class="page" id="dashboardContent" aria-live="polite"></main>
