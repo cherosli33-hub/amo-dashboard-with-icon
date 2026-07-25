@@ -512,7 +512,7 @@ function renderDashboard(){
     <div class="header">
       <div>
         <div class="date">ETD &middot; ${esc(now.toLocaleDateString("ms-MY",{day:"numeric",month:"long",year:"numeric"}))}</div>
-        <h1>Log Prosedur Assistan Medical Officer (A.M.O)</h1>
+        <h1>Assistant Medical Officer (A.M.O) Procedure Log</h1>
       </div>
       <div class="icon">
         <img src="./prosedur-icon.png?v=2.6.0" alt="Logo Log Prosedur A.M.O">
@@ -937,7 +937,7 @@ renderDashboard = function(){
     return { ...s, val, len, start };
   });
   const html = `
-    <div class="header"><div><div class="date">ETD &middot; ${esc(now.toLocaleDateString("ms-MY",{day:"numeric",month:"long",year:"numeric"}))}</div><h1>Log Prosedur Assistan Medical Officer (A.M.O)</h1></div><div class="icon"><img src="./prosedur-icon.png?v=2.6.0" alt="Logo Log Prosedur A.M.O"></div></div>
+    <div class="header"><div><div class="date">ETD &middot; ${esc(now.toLocaleDateString("ms-MY",{day:"numeric",month:"long",year:"numeric"}))}</div><h1>Assistant Medical Officer (A.M.O) Procedure Log</h1></div><div class="icon"><img src="./prosedur-icon.png?v=2.6.0" alt="Logo Log Prosedur A.M.O"></div></div>
     ${state.syncError ? `<button class="sync-warn" onclick="loadCases()"><span>Tak dapat sync dengan Google Sheet. Data baru disimpan dalam app sahaja. Tekan untuk cuba lagi.</span></button>` : ""}
     <div class="ring-card"><div class="ring-row"><div class="ring-box"><svg width="168" height="168" viewBox="0 0 168 168" style="transform:rotate(-90deg)"><circle cx="84" cy="84" r="${R}" fill="none" stroke="#F1EEE5" stroke-width="14"/>${arcs.map(arc => `<circle cx="84" cy="84" r="${R}" fill="none" stroke="${arc.hex}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${arc.len} ${CIRC-arc.len}" stroke-dashoffset="${-arc.start}" opacity="${arc.id===currentShiftId ? 1 : 0.55}"/>`).join("")}</svg><div class="ring-center"><span class="num">${todayPatientCount}</span><span class="lbl">pesakit hari ini</span></div></div><div class="ring-legend">${SHIFTS.map(s => `<div class="ring-legend-row"><div class="ring-legend-left"><span class="dot" style="background:${s.hex}; ${s.id===currentShiftId ? `box-shadow:0 0 0 3px ${s.glow}` : ""}"></span><span class="label">${s.label}</span>${s.id===currentShiftId ? `<span class="now-tag">sekarang</span>` : ""}</div><span class="count">${shiftCount[s.id] || 0}</span></div>`).join("")}</div></div></div>
     <div class="section"><h2>Prosedur paling kerap</h2>${topProcedures.length === 0 ? `<div class="empty-note">Belum ada prosedur direkod hari ini.</div>` : topProcedures.map(([name,count],i) => `<div class="bar-row"><div class="bar-top"><span class="name">${esc(name)}</span><span class="count">${count}</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.max((count/maxProcCount)*100,5)}%; background:${i===0 ? "linear-gradient(90deg,#6FE3A8,#4FC890)" : "#E4E0D5"}"></div></div></div>`).join("")}</div>
