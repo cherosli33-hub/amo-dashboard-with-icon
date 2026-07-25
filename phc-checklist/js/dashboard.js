@@ -80,7 +80,7 @@ function render(){
 function showRestock(lowItems){
   if(!lowItems.length){ alert("Tiada item perlu restock."); return; }
   restockModal.hidden=false;
-  restockModal.innerHTML=`<section class="modal restock-modal" role="dialog" aria-modal="true" aria-label="Item perlu restock"><div class="modal-handle"></div><div class="modal-head"><div><p class="eyebrow">AMARAN STOK</p><h2>Item Perlu Restock</h2></div><button class="modal-close" aria-label="Tutup">\u00d7</button></div><p class="restock-help">Semak semua item di bawah. Tekan butang selepas semuanya dimasukkan semula ke dalam beg.</p><div class="restock-table">${lowItems.map(item=>`<div class="restock-table-row"><div class="restock-summary"><span><strong>${esc(item.name)}</strong><small>Standard ${item.standard} \u00b7 ${item.bag} \u00b7 ${item.shift}</small></span><span class="restock-qty">${item.qty}/${item.standard}</span></div></div>`).join("")}</div><button class="button primary full restock-all" id="completeAllRestock">\u2713 Semua Stok Telah Ditambah</button></section>`;
+  restockModal.innerHTML=`<section class="modal restock-modal" role="dialog" aria-modal="true" aria-label="Item perlu restock"><div class="modal-handle"></div><div class="modal-head"><div><p class="eyebrow">AMARAN STOK</p><h2>Item Perlu Restock</h2></div><button class="modal-close" aria-label="Tutup">\u00d7</button></div><p class="restock-help">Tekan \u201cTambah item ini\u201d untuk satu item sahaja, atau \u201cSemua Stok Telah Ditambah\u201d untuk semua sekali.</p><div class="restock-table">${lowItems.map(item=>`<div class="restock-table-row"><div class="restock-summary"><span><strong>${esc(item.name)}</strong><small>Standard ${item.standard} \u00b7 ${item.bag} \u00b7 ${item.shift}</small></span><span class="restock-qty">${item.qty}/${item.standard}</span></div><button class="button ghost restock-one" data-restock-key="${esc(item.key)}" data-restock-finding="${esc(item.findingId)}">\u2713 Tambah item ini</button></div>`).join("")}</div><button class="button primary full restock-all" id="completeAllRestock">\u2713 Semua Stok Telah Ditambah</button></section>`;
 }
 function showNoteActions(notes){
   if(!notes.length){ alert("Tiada catatan memerlukan tindakan."); return; }
@@ -132,6 +132,24 @@ restockModal.addEventListener("click",async event=>{
       connectionMessage=result.pending?"Status disimpan pada telefon dan akan dihantar semula.":`Catatan ditanda: ${status}.`;
       render();
     }).catch(()=>{ connectionMessage="Status disimpan pada telefon dan akan dihantar semula."; render(); });
+    return;
+  }
+  const oneButton=event.target.closest(".restock-one");
+  if(oneButton){
+    if(!confirm("Item ini telah ditambah ke dalam beg?")) return;
+    oneButton.disabled=true; oneButton.textContent="Menyimpan...";
+    const key=oneButton.dataset.restockKey; const findingId=oneButton.dataset.restockFinding;
+    saveRestockAction(key,"Semua stok telah ditambah",{findingId,syncStatus:"PENDING"});
+    // Naikkan qty item ini sahaja dalam inventori tempatan
+    const stampOne=new Date().toISOString();
+    const latestOne=loadLatestInventory();
+    Object.values(latestOne).forEach(record=>{ const copy=structuredClone(record); let ubah=false; Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(item=>{ if(`${record.id}|${item.name}`===key && item.qty<item.standard){ item.qty=item.standard; ubah=true; } })); if(ubah){ copy.savedAt=stampOne; saveLatestInventory(copy); } });
+    restockModal.hidden=true; connectionMessage="Item ditanda. Menghantar tindakan ke Google Sheet..."; render();
+    const resOne=await syncPendingRestockActions().catch(()=>({synced:0,pending:1}));
+    connectionMessage=resOne.pending
+      ? `Item dikemas kini pada telefon. Tindakan BELUM masuk Sheet${resOne.lastError?` (${resOne.lastError})`:""}. Cuba semula automatik.`
+      : `Item direkodkan dalam Google Sheet sebagai Telah diambil tindakan.`;
+    render();
     return;
   }
   const button=event.target.closest("#completeAllRestock"); if(!button) return;
