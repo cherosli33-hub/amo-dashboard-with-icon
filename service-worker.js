@@ -1,4 +1,4 @@
-const CACHE = "amo-etd-lepeh-v17-phc-module";
+const CACHE = "amo-etd-lepeh-v18-update-bar";
 const ASSETS = [
   "./",
   "./index.html",
@@ -56,7 +56,7 @@ async function withAmoHeader(response){
 }
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
 });
 
 self.addEventListener("activate", event => {
@@ -81,4 +81,9 @@ self.addEventListener("fetch", event => {
     const fallback = response || await caches.match("./index.html");
     return fallback && isAmoPage(event.request) ? withAmoHeader(fallback) : fallback;
   })));
+});
+
+// Aktifkan worker baharu bila pengguna tekan "Kemas kini" di portal.
+self.addEventListener("message", event => {
+  if(event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });

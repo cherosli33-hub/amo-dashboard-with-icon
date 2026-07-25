@@ -53,9 +53,53 @@
     </section>
 
     <p class="portal-note">Sambungan internet diperlukan untuk Dashboard A.M.O dan penyegerakan Google Sheet.</p>
+    <p class="portal-version">Prosedur v<span id="vProsedur">1.0</span> &middot; Asma v<span id="vAsthma">1.0</span> &middot; PHC v<span id="vPhc">2.6.0</span></p>
   </main>
+  <div class="update-bar" id="updateBar" hidden role="status">
+    <span class="update-bar-icon" aria-hidden="true">\u21bb</span>
+    <span class="update-bar-text"><strong>Versi baharu tersedia</strong><small>Tekan untuk kemas kini ke versi terkini</small></span>
+    <button type="button" id="updateBtn">Kemas kini</button>
+  </div>
   <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+    // Nombor versi modul (portal). Naikkan bila ada perubahan Prosedur / Asthma.
+    const MODULE_VERSIONS = { prosedur: "1.0", asthma: "1.0", phc: "2.6.0" };
+    document.getElementById("vProsedur").textContent = MODULE_VERSIONS.prosedur;
+    document.getElementById("vAsthma").textContent = MODULE_VERSIONS.asthma;
+    document.getElementById("vPhc").textContent = MODULE_VERSIONS.phc;
+
+    // Kesan service worker versi baharu -> papar bar "Kemas kini"
+    if ('serviceWorker' in navigator) {
+      const bar = document.getElementById("updateBar");
+      const btn = document.getElementById("updateBtn");
+      let waitingWorker = null;
+
+      function showBar(worker){ waitingWorker = worker; bar.hidden = false; }
+
+      navigator.serviceWorker.register('./service-worker.js').then(reg => {
+        // Kes 1: sudah ada worker menunggu semasa halaman dibuka
+        if (reg.waiting && navigator.serviceWorker.controller) showBar(reg.waiting);
+        // Kes 2: worker baharu ditemui semasa halaman terbuka
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) showBar(nw);
+          });
+        });
+      });
+
+      btn.addEventListener('click', () => {
+        btn.disabled = true; btn.textContent = "Mengemas kini\u2026";
+        if (waitingWorker) waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+        else location.reload();
+      });
+
+      // Bila worker baharu ambil alih, muat semula halaman sekali
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return; refreshing = true; location.reload();
+      });
+    }
   </script>
 </body>
 </html>
