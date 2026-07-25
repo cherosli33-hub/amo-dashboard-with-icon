@@ -206,3 +206,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .update-bar button { flex: 0 0 auto; border: 0; background: var(--teal); color: #fff; font-weight: 800; font-size: .78rem; padding: 10px 15px; border-radius: 11px; cursor: pointer; }
 .update-bar button:disabled { opacity: .6; }
 @media (max-width: 390px) { .update-bar-text strong { font-size: .8rem; } .update-bar-text small { font-size: .68rem; } }
+
+/* Pilihan tarikh penilaian Asthma (Hari ini / Tarikh lain) */
+.datetime-toggle { display: flex; gap: 8px; margin-bottom: 8px; }
+.datetime-toggle .dt-opt { flex: 1; border: 1px solid var(--line); background: #fff; color: var(--muted); font-weight: 700; font-size: .82rem; padding: 9px 10px; border-radius: 10px; cursor: pointer; }
+.datetime-toggle .dt-opt.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+.datetime-auto { display: flex; gap: 8px; }
+.datetime-auto input { flex: 1; }
+.datetime-custom { display: flex; flex-wrap: wrap; gap: 8px; }
+.datetime-custom input[type="date"], .datetime-custom input[type="time"] { flex: 1 1 130px; }
+.datetime-custom .dt-note { flex: 1 1 100%; color: var(--muted); font-size: .72rem; margin-top: 2px; }

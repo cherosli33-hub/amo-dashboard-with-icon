@@ -43,8 +43,19 @@
             <div class="field"><label for="sex">Jantina</label><select id="sex" name="sex" required><option value="">Pilih</option><option value="male">Lelaki</option><option value="female">Perempuan</option></select></div>
             <div class="field full" id="adultHeightField"><label for="heightAdult">Tinggi</label><div class="unit-field"><input id="heightAdult" name="heightAdult" type="number" min="120" max="210" step="1" required><span class="unit">cm</span></div></div>
             <div class="field full" id="paediatricHeightField" hidden><label for="heightPaediatric">Tinggi rujukan pediatrik</label><select id="heightPaediatric" name="heightPaediatric"><option value="">Pilih tinggi</option></select><small>Nilai tepat daripada jadual EU/EN13826; tiada interpolasi.</small></div>
-            <div class="field"><label>Tarikh</label><input id="displayDate" disabled></div>
-            <div class="field"><label>Masa</label><input id="displayTime" disabled></div>
+            <div class="field full">
+              <label>Tarikh & masa penilaian</label>
+              <div class="datetime-toggle" role="group" aria-label="Pilihan tarikh">
+                <button type="button" id="dtToday" class="dt-opt active">Hari ini</button>
+                <button type="button" id="dtOther" class="dt-opt">Tarikh lain</button>
+              </div>
+              <div class="datetime-auto" id="dtAuto"><input id="displayDate" disabled><input id="displayTime" disabled></div>
+              <div class="datetime-custom" id="dtCustom" hidden>
+                <input type="date" id="customDate" aria-label="Pilih tarikh">
+                <input type="time" id="customTime" aria-label="Pilih masa">
+                <small class="dt-note">Hanya dalam tempoh 7 hari lepas dibenarkan. Tarikh hadapan tidak dibenarkan.</small>
+              </div>
+            </div>
           </div>
         </section>
 
