@@ -48,6 +48,66 @@ function setAssessmentTime(date = new Date()) {
   document.querySelector("#displayDate").value = displayDate(date);
   document.querySelector("#displayTime").value = displayTime(date);
 }
+
+// ----- Mod tarikh: Hari ini (auto) vs Tarikh lain (custom, maks 7 hari lepas) -----
+let dateMode = "today";
+function pad2(n){ return String(n).padStart(2, "0"); }
+function toDateInput(d){ return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+function toTimeInput(d){ return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+
+function initDateControls() {
+  const btnToday = document.querySelector("#dtToday");
+  const btnOther = document.querySelector("#dtOther");
+  const auto = document.querySelector("#dtAuto");
+  const custom = document.querySelector("#dtCustom");
+  const cDate = document.querySelector("#customDate");
+  const cTime = document.querySelector("#customTime");
+  if(!btnToday || !btnOther) return;
+
+  function applyBounds() {
+    const now = new Date();
+    const min = new Date(now); min.setDate(min.getDate() - 7); min.setHours(0,0,0,0);
+    cDate.min = toDateInput(min);
+    cDate.max = toDateInput(now);
+  }
+  function setMode(mode) {
+    dateMode = mode;
+    btnToday.classList.toggle("active", mode === "today");
+    btnOther.classList.toggle("active", mode === "other");
+    auto.hidden = mode !== "today";
+    custom.hidden = mode !== "other";
+    if(mode === "today") {
+      setAssessmentTime(new Date());
+    } else {
+      applyBounds();
+      const now = new Date();
+      if(!cDate.value) cDate.value = toDateInput(now);
+      if(!cTime.value) cTime.value = toTimeInput(now);
+      syncCustom();
+    }
+  }
+  function syncCustom() {
+    if(!cDate.value) return;
+    const [y,m,d] = cDate.value.split("-").map(Number);
+    const [hh,mm] = (cTime.value || "12:00").split(":").map(Number);
+    const picked = new Date(y, m-1, d, hh||0, mm||0, 0, 0);
+    // Kekang: tidak boleh masa hadapan, tidak boleh lebih 7 hari lepas
+    const now = new Date();
+    const min = new Date(now); min.setDate(min.getDate() - 7); min.setHours(0,0,0,0);
+    if(picked > now) { setAssessmentTime(new Date()); return; }
+    if(picked < min) { return; }
+    assessmentTime = picked; // guna terus (jangan papar semula pada medan disabled)
+  }
+  btnToday.addEventListener("click", () => setMode("today"));
+  btnOther.addEventListener("click", () => setMode("other"));
+  cDate.addEventListener("change", syncCustom);
+  cTime.addEventListener("change", syncCustom);
+  applyBounds();
+}
+function resetDateControls() {
+  const btnToday = document.querySelector("#dtToday");
+  if(btnToday) btnToday.click();
+}
 function patientType() { return patientTypeInputs.find(input => input.checked)?.value ?? "adult"; }
 function selectedHeight() { return patientType() === "adult" ? Number(adultHeightInput.value) : Number(paediatricHeightInput.value); }
 function isPefrNotDone() { return pefrNotDoneInput.checked; }
@@ -308,6 +368,7 @@ function resetForm() {
   document.querySelector('input[name="patientType"][value="adult"]').checked = true;
   document.querySelector('input[name="uptriage"][value="None"]').checked = true;
   setAssessmentTime(new Date());
+  resetDateControls();
   state = { ideal: null, beforePercentage: null, afterPercentage: null };
   formDirty = false;
   updateNotDoneMode();
@@ -417,6 +478,7 @@ referenceDialog.addEventListener("click", event => { if (event.target === refere
 
 populatePaediatricHeights();
 setAssessmentTime();
+initDateControls();
 syncNotice.hidden = Boolean(endpoint());
 if (!endpoint()) { syncNotice.hidden = false; syncNotice.textContent = "Google Sheet belum disambungkan. Rekod hanya boleh disimpan sementara pada peranti ini."; }
 updateNotDoneMode();
