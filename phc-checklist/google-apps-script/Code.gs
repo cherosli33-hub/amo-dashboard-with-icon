@@ -1,3 +1,20 @@
+// ============================================================================
+// SALINAN RUJUKAN LAMA - JANGAN GUNA SEBAGAI SUMBER
+// ============================================================================
+// Kod di BAWAH ini ialah versi 2.5.9 (lama). Ia TIDAK dijalankan.
+//
+// Backend SEBENAR yang dijalankan ada dalam Apps Script editor:
+//   Projek: "PHC Checklist - Sheet API"
+//   Versi live: 2.6.1
+//   Ciri tambahan yang TIADA dalam fail ini:
+//     - priorActions (kekalkan tindakan semasa re-save pemeriksaan)
+//     - getDashboard_ (payload dashboard ringan)
+//     - logik anti-pendua penemuan restock (item sama antara shift tak
+//       jadi pendua; hanya item baru atau item yang sudah selesai dikira)
+//
+// Untuk kod tepat, buka Apps Script editor. Fail ini rujukan sejarah sahaja.
+// ============================================================================
+
 const APP_VERSION = '2.5.9';
 const TIME_ZONE = 'Asia/Kuala_Lumpur';
 const SHEETS = Object.freeze({
