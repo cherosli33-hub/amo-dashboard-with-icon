@@ -1,21 +1,6 @@
-// ============================================================================
-// SALINAN RUJUKAN LAMA - JANGAN GUNA SEBAGAI SUMBER
-// ============================================================================
-// Kod di BAWAH ini ialah versi 2.5.9 (lama). Ia TIDAK dijalankan.
-//
-// Backend SEBENAR yang dijalankan ada dalam Apps Script editor:
-//   Projek: "PHC Checklist - Sheet API"
-//   Versi live: 2.6.1
-//   Ciri tambahan yang TIADA dalam fail ini:
-//     - priorActions (kekalkan tindakan semasa re-save pemeriksaan)
-//     - getDashboard_ (payload dashboard ringan)
-//     - logik anti-pendua penemuan restock (item sama antara shift tak
-//       jadi pendua; hanya item baru atau item yang sudah selesai dikira)
-//
-// Untuk kod tepat, buka Apps Script editor. Fail ini rujukan sejarah sahaja.
-// ============================================================================
+const APP_VERSION = '2.6.1';
 
-const APP_VERSION = '2.5.9';
+
 const TIME_ZONE = 'Asia/Kuala_Lumpur';
 const SHEETS = Object.freeze({
   inspections: 'PEMERIKSAAN',
@@ -30,10 +15,9 @@ const VALID_SHIFTS = ['Pagi','Petang','Malam'];
 function doGet(e) {
   try {
     const action = String((e && e.parameter && e.parameter.action) || 'health');
-    if (action === 'health') return json_(health_());
+    if (action === 'health') return json_({ok:true, app:'PHC Checklist', version:APP_VERSION, time:new Date().toISOString()});
     if (action === 'records') return json_({ok:true, records:getRecords_(e.parameter.from, e.parameter.to)});
-    if (action === 'findings') return json_({ok:true, findings:getFindings_(e.parameter.from, e.parameter.to, String(e.parameter.all || '') === '1')});
-    if (action === 'dashboard') return json_(getDashboard_(e.parameter.from, e.parameter.to));
+    if (action === 'findings') return json_({ok:true, findings:getFindings_(e.parameter.from, e.parameter.to, String(e.parameter.all || '') === '1')}); if (action === 'dashboard') return json_(getDashboard_(e.parameter.from, e.parameter.to));
     return json_({ok:false, message:'Tindakan tidak dikenali.'});
   } catch (error) {
     return json_({ok:false, message:error.message || String(error)});
@@ -67,6 +51,7 @@ function resolveFinding_(findingId, resolution, resolutionStatus) {
     action, new Date(), sheet.getRange(match.getRow(),13).getValue(), status
   ]]);
   sheet.getRange(match.getRow(),12).setNumberFormat('yyyy-mm-dd HH:mm');
+  updateMonthlyReport_(spreadsheet);
   SpreadsheetApp.flush();
   return {ok:true, findingId:id, status:status, savedAt:new Date().toISOString()};
 }
@@ -97,9 +82,16 @@ function saveInspection_(record, clientVersion) {
       'SYNCED', safeText_(clientVersion || APP_VERSION, 30),
     ];
 
+    const priorActions = {};
     const existing = findRowByValue_(inspectionSheet, 2, checked.checkKey);
     if (existing) {
       const oldId = String(inspectionSheet.getRange(existing, 1).getValue());
+      // Kekalkan tindakan yang sudah diambil sebelum baris penemuan lama dibuang.
+      dataRows_(findingSheet, 14).forEach(function(row){
+        if (String(row[1]) === oldId && (row[10] || row[13])) {
+          priorActions[String(row[7])] = {action: row[10], at: row[11], status: row[13]};
+        }
+      });
       deleteRowsByValue_(checkSheet, 1, oldId);
       deleteRowsByValue_(findingSheet, 2, oldId);
       inspectionSheet.getRange(existing, 1, 1, inspectionRow.length).setValues([inspectionRow]);
@@ -115,19 +107,35 @@ function saveInspection_(record, clientVersion) {
     ]);
     appendRows_(checkSheet, checkRows);
 
-    const findingRows = items.filter(item => item.qty < item.standard).map((item, index) => [
+    const __dateKey = formatIsoDate_(date);
+    const outstanding = {};
+    dataRows_(findingSheet, 14).forEach(function(row){
+      var rowDate; try { rowDate = formatIsoDate_(row[2]); } catch(e){ rowDate = String(row[2]||""); }
+      var rowBag = String(row[6]||"").split(" / ")[0];
+      var rowItem = String(row[7]||"");
+      var rowStatus = String(row[13]||"");
+      var rowInspId = String(row[1]||"");
+      if(rowDate===__dateKey && rowBag===checked.bag && rowStatus==="Belum diambil tindakan" && rowInspId!==checked.id && rowItem && rowItem!=="Catatan pengguna"){
+        outstanding[rowBag+"|"+rowItem]=true;
+      }
+    });
+    const findingRows = items.filter(item => item.qty < item.standard).filter(item => !outstanding[checked.bag+"|"+item.name]).map((item, index) => {
+      const prior = priorActions[item.name] || {};
+      return [
       `${checked.id}-F${String(index + 1).padStart(3, '0')}`, checked.id, date, monthName,
       monthNumber, date.getFullYear(), `${checked.bag} / ${checked.shift}`, item.name,
-      item.qty, item.standard, '', '', '', 'Belum diambil tindakan',
-    ]);
+      item.qty, item.standard, prior.action || '', prior.at || '', '', prior.status || 'Belum diambil tindakan',
+    ];
+    });
     if (checked.notes) {
       findingRows.push([
         `${checked.id}-NOTE`, checked.id, date, monthName, monthNumber, date.getFullYear(),
-        `${checked.bag} / ${checked.shift}`, 'Catatan pengguna', '', '', '', '', checked.notes,
-        'Belum diambil tindakan',
+        `${checked.bag} / ${checked.shift}`, 'Catatan pengguna', '', '', (priorActions['Catatan pengguna']||{}).action || '', (priorActions['Catatan pengguna']||{}).at || '', checked.notes,
+        (priorActions['Catatan pengguna']||{}).status || 'Belum diambil tindakan',
       ]);
     }
     appendRows_(findingSheet, findingRows);
+    /* Pemformatan Sheet sudah tersedia; elak kerja berulang semasa simpan. */
     SpreadsheetApp.flush();
     return {ok:true, id:checked.id, savedAt:new Date().toISOString(), itemCount:items.length, findingCount:findingRows.length};
   } finally {
@@ -135,18 +143,8 @@ function saveInspection_(record, clientVersion) {
   }
 }
 
-function getDashboard_(fromText, toText) {
+function getRecords_(fromText, toText, latestInventoryOnly) {
   const spreadsheet = getSpreadsheet_();
-  return {
-    ok:true,
-    version:APP_VERSION,
-    records:getRecords_(fromText, toText, spreadsheet, true),
-    findings:getFindings_(fromText, toText, true, spreadsheet),
-  };
-}
-
-function getRecords_(fromText, toText, sourceSpreadsheet, latestInventoryOnly) {
-  const spreadsheet = sourceSpreadsheet || getSpreadsheet_();
   const inspectionSheet = requiredSheet_(spreadsheet, SHEETS.inspections);
   const checkSheet = requiredSheet_(spreadsheet, SHEETS.checks);
   const fromKey = fromText ? safeText_(fromText, 10) : '2000-01-01';
@@ -163,15 +161,7 @@ function getRecords_(fromText, toText, sourceSpreadsheet, latestInventoryOnly) {
     if (!current || normaliseDate_(row[2]).getTime() > normaliseDate_(current[2]).getTime()) selectedMap[key] = row;
   });
   const selected = Object.values(selectedMap);
-  let ids = new Set(selected.map(row => String(row[0])));
-  if (latestInventoryOnly) {
-    const latestByBag = {};
-    selected.forEach(row => {
-      const bag = String(row[7]);
-      if (!latestByBag[bag] || normaliseDate_(row[2]).getTime() > normaliseDate_(latestByBag[bag][2]).getTime()) latestByBag[bag] = row;
-    });
-    ids = new Set(Object.values(latestByBag).map(row => String(row[0])));
-  }
+  let ids = new Set(selected.map(row => String(row[0]))); if (latestInventoryOnly) { const latestByBag={}; selected.forEach(row=>{ const bag=String(row[7]); if(!latestByBag[bag]||normaliseDate_(row[2]).getTime()>normaliseDate_(latestByBag[bag][2]).getTime()) latestByBag[bag]=row; }); ids=new Set(Object.values(latestByBag).map(row=>String(row[0]))); }
   const itemRows = dataRows_(checkSheet, 18).filter(row => ids.has(String(row[0])));
   const quantitiesById = {};
   itemRows.forEach(row => {
@@ -188,19 +178,8 @@ function getRecords_(fromText, toText, sourceSpreadsheet, latestInventoryOnly) {
   }));
 }
 
-function health_() {
+function getFindings_(fromText, toText, includeAll) {
   const spreadsheet = getSpreadsheet_();
-  return {
-    ok:true, app:'PHC Checklist', version:APP_VERSION, time:new Date().toISOString(),
-    idTail:spreadsheet.getId().slice(-8),
-    timeZone:spreadsheet.getSpreadsheetTimeZone() || TIME_ZONE,
-    inspectionRows:Math.max(0, requiredSheet_(spreadsheet, SHEETS.inspections).getLastRow() - 1),
-    findingRows:Math.max(0, requiredSheet_(spreadsheet, SHEETS.findings).getLastRow() - 1),
-  };
-}
-
-function getFindings_(fromText, toText, includeAll, sourceSpreadsheet) {
-  const spreadsheet = sourceSpreadsheet || getSpreadsheet_();
   const sheet = requiredSheet_(spreadsheet, SHEETS.findings);
   const fromKey = fromText ? safeText_(fromText, 10) : '2000-01-01';
   const toKey = toText ? safeText_(toText, 10) : '2100-12-31';
@@ -209,12 +188,12 @@ function getFindings_(fromText, toText, includeAll, sourceSpreadsheet) {
     const dateKey = formatIsoDate_(row[2]);
     return row[0] && (includeAll || String(row[7]) === 'Catatan pengguna') && dateKey >= fromKey && dateKey <= toKey;
   }).map(row => ({
-    type:String(row[7]) === 'Catatan pengguna' ? 'note' : 'shortage',
-    id:String(row[0]), inspectionId:String(row[1]), date:formatIsoDate_(row[2]),
-    bagShift:String(row[6]), item:String(row[7]) === 'Catatan pengguna' ? '' : String(row[7] || ''),
-    qty:String(row[7]) === 'Catatan pengguna' ? null : Number(row[8]),
-    standard:String(row[7]) === 'Catatan pengguna' ? null : Number(row[9]),
-    note:String(row[7]) === 'Catatan pengguna' ? String(row[12] || '') : '', action:String(row[10] || ''),
+    type:String(row[7]) === 'Catatan pengguna' ? 'note' : 'shortage', id:String(row[0]), inspectionId:String(row[1]), date:formatIsoDate_(row[2]),
+    /* RESTOCK_SYNC_CLEANUP */
+    /* RESTOCK_SYNC_CLEANUP */
+    /* RESTOCK_SYNC_CLEANUP */
+    /* RESTOCK_SYNC_CLEANUP */
+    /* RESTOCK_SYNC_CLEANUP */
     actionAt:row[11] ? normaliseDateTime_(row[11]) : '', status:String(row[13] || 'Belum diambil tindakan'),
   }));
 }
@@ -341,7 +320,7 @@ function migrateProductionData() {
   rewriteData_(inspectionSheet, 15, keptInspections);
   rewriteData_(checkSheet, 18, keptChecks);
   rewriteData_(findingSheet, 14, rebuiltFindings);
-  applyProductionFormatting_(spreadsheet);
+  /* Pemformatan Sheet sudah tersedia; elak kerja berulang semasa simpan. */
   updateMonthlyReport_(spreadsheet);
   SpreadsheetApp.flush();
   return `Migrasi selesai: ${keptInspections.length} pemeriksaan unik, ${rebuiltFindings.length} penemuan.`;
@@ -388,18 +367,9 @@ function appendRows_(sheet, rows) { if(rows.length) sheet.getRange(sheet.getLast
 function idExists_(sheet, id) { if(sheet.getLastRow()<2) return false; return !!sheet.getRange(2,1,sheet.getLastRow()-1,1).createTextFinder(id).matchEntireCell(true).findNext(); }
 function findRowByValue_(sheet, column, value) { if(sheet.getLastRow()<2) return 0; const match=sheet.getRange(2,column,sheet.getLastRow()-1,1).createTextFinder(String(value)).matchEntireCell(true).findNext(); return match ? match.getRow() : 0; }
 function deleteRowsByValue_(sheet, column, value) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-  const values = sheet.getRange(2, column, lastRow - 1, 1).getDisplayValues();
-  const rows = values.map((row, index) => String(row[0]) === String(value) ? index + 2 : 0).filter(Boolean);
-  if (!rows.length) return;
-  const groups = [];
-  rows.forEach(row => {
-    const current = groups[groups.length - 1];
-    if (current && row === current.start + current.count) current.count += 1;
-    else groups.push({start:row, count:1});
-  });
-  groups.reverse().forEach(group => sheet.deleteRows(group.start, group.count));
+  const columns = sheet.getLastColumn();
+  const kept = dataRows_(sheet, columns).filter(row => String(row[column - 1]) !== String(value));
+  rewriteData_(sheet, columns, kept);
 }
 function rewriteData_(sheet, columns, rows) { const existing=Math.max(0,sheet.getLastRow()-1); if(existing) sheet.getRange(2,1,existing,Math.max(columns,sheet.getLastColumn())).clearContent(); if(rows.length) sheet.getRange(2,1,rows.length,columns).setValues(rows.map(row=>row.slice(0,columns))); }
 function safeText_(value, max) { return String(value == null ? '' : value).replace(/[\u0000-\u001F\u007F]/g,' ').trim().slice(0,max); }
@@ -407,4 +377,6 @@ function parseIsoDate_(text) { if(!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new E
 function normaliseDate_(value) { return value instanceof Date ? value : new Date(value); }
 function normaliseDateTime_(value) { return normaliseDate_(value).toISOString(); }
 function formatIsoDate_(value) { return Utilities.formatDate(normaliseDate_(value), TIME_ZONE, 'yyyy-MM-dd'); }
-function json_(payload) { return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON); }
+function json_(payload) { return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON); } function getDashboard_(fromText,toText) { return {ok:true,version:APP_VERSION,records:getRecords_(fromText,toText,true),findings:getFindings_(fromText,toText,true)}; } function deleteRowsByValue_(sheet,column,value) { const lastRow=sheet.getLastRow(); if(lastRow<2)return; const rows=sheet.getRange(2,column,lastRow-1,1).getDisplayValues().map((row,index)=>String(row[0])===String(value)?index+2:0).filter(Boolean); if(!rows.length)return; const groups=[]; rows.forEach(row=>{const current=groups[groups.length-1];if(current&&row===current.start+current.count)current.count+=1;else groups.push({start:row,count:1});}); groups.reverse().forEach(group=>sheet.deleteRows(group.start,group.count)); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); }
+
+
