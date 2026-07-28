@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.1';
+const APP_VERSION = '2.6.2';
 
 
 const TIME_ZONE = 'Asia/Kuala_Lumpur';
@@ -17,7 +17,7 @@ function doGet(e) {
     const action = String((e && e.parameter && e.parameter.action) || 'health');
     if (action === 'health') return json_({ok:true, app:'PHC Checklist', version:APP_VERSION, time:new Date().toISOString()});
     if (action === 'records') return json_({ok:true, records:getRecords_(e.parameter.from, e.parameter.to)});
-    if (action === 'findings') return json_({ok:true, findings:getFindings_(e.parameter.from, e.parameter.to, String(e.parameter.all || '') === '1')}); if (action === 'dashboard') return json_(getDashboard_(e.parameter.from, e.parameter.to));
+    if (action === 'findings') return json_({ok:true, findings:getFindings_(e.parameter.from, e.parameter.to, String(e.parameter.all || '') === '1')}); if (action === 'dashboard') return json_(getDashboard_(e.parameter.from, e.parameter.to)); if (action === 'latestInventory') return json_({ok:true, records:getEffectiveLatestInventory_()});
     return json_({ok:false, message:'Tindakan tidak dikenali.'});
   } catch (error) {
     return json_({ok:false, message:error.message || String(error)});
@@ -176,6 +176,30 @@ function getRecords_(fromText, toText, latestInventoryOnly) {
     bag:String(row[7]), shift:String(row[8]), ppp:String(row[9]), notes:String(row[12] || ''),
     syncStatus:'SYNCED', appVersion:String(row[14] || ''), quantities:quantitiesById[String(row[0])] || {},
   }));
+}
+
+function getEffectiveLatestInventory_() {
+  const records = getRecords_(null, null, true);
+  const findingSheet = requiredSheet_(getSpreadsheet_(), SHEETS.findings);
+  const findingRows = dataRows_(findingSheet, 14);
+  records.forEach(record => {
+    const outstanding = {};
+    findingRows.forEach(row => {
+      let rowDate; try { rowDate = formatIsoDate_(row[2]); } catch (e) { rowDate = String(row[2] || ''); }
+      const rowBag = String(row[6] || '').split(' / ')[0];
+      const rowItem = String(row[7] || '');
+      const rowStatus = String(row[13] || '');
+      if (rowDate === record.date && rowBag === record.bag && rowItem && rowItem !== 'Catatan pengguna' && rowStatus === 'Belum diambil tindakan') {
+        outstanding[rowItem] = true;
+      }
+    });
+    Object.values(record.quantities || {}).forEach(category => {
+      (category.items || []).forEach(item => {
+        if (item.qty < item.standard && !outstanding[item.name]) item.qty = item.standard;
+      });
+    });
+  });
+  return records;
 }
 
 function getFindings_(fromText, toText, includeAll) {
