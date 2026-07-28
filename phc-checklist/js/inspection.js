@@ -13,7 +13,7 @@ async function buildQuantities(mode){
   if(mode==="copy" && apiConfigured() && navigator.onLine){
     try{
       const records=await fetchLatestInventory();
-      const serverRecord=records.find(record=>record.bag===state.bag);
+      const serverRecord=records.find(record=>record.bag===state.bag && record.quantities && Object.keys(record.quantities).length);
       if(serverRecord){ last=serverRecord; saveLatestInventory(serverRecord); }
     }catch{ /* pelayan tak dapat dihubungi — guna cache tempatan */ }
   }
