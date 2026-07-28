@@ -63,6 +63,14 @@ export async function fetchDashboard(from,to){
     };
 }
 
+export async function fetchLatestInventory(){
+    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    const url=new URL(APPS_SCRIPT_URL); url.searchParams.set("action","latestInventory");
+    url.searchParams.set("_ts",String(Date.now()));
+    const data=await request(url.toString(),{cache:"no-store"});
+    return Array.isArray(data.records)?data.records:[];
+}
+
 async function sendInspection(record){
     const data=await request(APPS_SCRIPT_URL,{
           method:"POST",
