@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.2';
+const APP_VERSION = '2.6.3';
 
 
 const TIME_ZONE = 'Asia/Kuala_Lumpur';
@@ -179,7 +179,13 @@ function getRecords_(fromText, toText, latestInventoryOnly) {
 }
 
 function getEffectiveLatestInventory_() {
-  const records = getRecords_(null, null, true);
+  const latestByBag = {};
+  getRecords_(null, null, true).forEach(record => {
+    if (!record.quantities || !Object.keys(record.quantities).length) return;
+    const current = latestByBag[record.bag];
+    if (!current || new Date(record.savedAt).getTime() > new Date(current.savedAt).getTime()) latestByBag[record.bag] = record;
+  });
+  const records = Object.values(latestByBag);
   const findingSheet = requiredSheet_(getSpreadsheet_(), SHEETS.findings);
   const findingRows = dataRows_(findingSheet, 14);
   records.forEach(record => {
