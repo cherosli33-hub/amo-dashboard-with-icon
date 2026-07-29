@@ -1,11 +1,11 @@
-const CACHE = "amo-etd-lepeh-v18-update-bar";
+const CACHE = "amo-etd-lepeh-v19-girn";
 const ASSETS = [
   "./",
   "./index.html",
   "./asthma.html",
   "./amo.html",
   "./amo-config.js",
-  "./styles.css?v=5",
+  "./styles.css?v=19",
   "./config.js?v=7",
   "./pefr.mjs",
   "./asthma.mjs?v=11",
@@ -14,6 +14,9 @@ const ASSETS = [
   "./icon-512.png?v=4",
   "./apple-touch-icon.png?v=4",
   "./favicon.png?v=4",
+  "./girn/girn-radio-logo.jpg?v=1",
+  "./girn/",
+  "./girn/index.html",
   "./references/adult-pefr-chart.jpeg",
   "./references/paediatric-pefr-table.jpeg",
   "./references/pefr-interpretation.jpeg"

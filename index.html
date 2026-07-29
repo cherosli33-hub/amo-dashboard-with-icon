@@ -12,7 +12,7 @@
   <link rel="manifest" href="./manifest.json?v=4">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4">
   <link rel="icon" type="image/png" href="./favicon.png?v=4">
-  <link rel="stylesheet" href="./styles.css?v=4">
+  <link rel="stylesheet" href="./styles.css?v=19">
 </head>
 <body class="portal-body">
   <main class="portal-shell">
@@ -50,10 +50,22 @@
         </span>
         <span class="portal-arrow" aria-hidden="true">›</span>
       </a>
+
+      <a class="portal-card portal-card-girn" href="./girn/">
+        <span class="portal-card-icon portal-card-radio" aria-hidden="true">
+          <img src="./girn/girn-radio-logo.jpg?v=1" alt="">
+          <i></i>
+        </span>
+        <span>
+          <strong>Pemeriksaan Radio GIRN</strong>
+          <small>Checklist syif, penemuan dan audit pemeriksaan</small>
+        </span>
+        <span class="portal-arrow" aria-hidden="true">›</span>
+      </a>
     </section>
 
-    <p class="portal-note">Sambungan internet diperlukan untuk Dashboard A.M.O dan penyegerakan Google Sheet.</p>
-    <p class="portal-version">Prosedur v<span id="vProsedur">1.0</span> &middot; Asma v<span id="vAsthma">1.0</span> &middot; PHC v<span id="vPhc">2.6.1</span></p>
+    <p class="portal-note">Sambungan internet diperlukan untuk Dashboard A.M.O serta penyegerakan Google Sheet modul Asma, PHC dan GIRN.</p>
+    <p class="portal-version">Prosedur v<span id="vProsedur">1.0</span> &middot; Asma v<span id="vAsthma">1.0</span> &middot; PHC v<span id="vPhc">2.6.1</span> &middot; GIRN v<span id="vGirn">1.0</span></p>
   </main>
   <div class="update-bar" id="updateBar" hidden role="status">
     <span class="update-bar-icon" aria-hidden="true">\u21bb</span>
@@ -62,10 +74,11 @@
   </div>
   <script>
     // Nombor versi modul (portal). Naikkan bila ada perubahan Prosedur / Asthma.
-    const MODULE_VERSIONS = { prosedur: "1.0", asthma: "1.0", phc: "2.6.1" };
+    const MODULE_VERSIONS = { prosedur: "1.0", asthma: "1.0", phc: "2.6.1", girn: "1.0" };
     document.getElementById("vProsedur").textContent = MODULE_VERSIONS.prosedur;
     document.getElementById("vAsthma").textContent = MODULE_VERSIONS.asthma;
     document.getElementById("vPhc").textContent = MODULE_VERSIONS.phc;
+    document.getElementById("vGirn").textContent = MODULE_VERSIONS.girn;
 
     // Kesan service worker versi baharu -> papar bar "Kemas kini"
     if ('serviceWorker' in navigator) {

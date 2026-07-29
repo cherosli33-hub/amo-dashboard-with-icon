@@ -4,6 +4,15 @@ PWA mudah alih yang menyediakan satu portal untuk:
 
 1. Dashboard Log Prosedur A.M.O sedia ada.
 2. Dashboard Penilaian PEFR Pesakit Asma.
+3. Dashboard Pemeriksaan PHC.
+4. Dashboard Pemeriksaan Radio GIRN.
+
+## Modul Pemeriksaan Radio GIRN
+
+Modul GIRN dibuka daripada kad portal bersaiz seragam dan menggunakan Google
+Sheet GIRN yang berasingan. Ia merangkumi dashboard status harian, checklist
+tiga syif, daftar penemuan, tindakan susulan dan paparan audit. Butang kembali
+dalam modul GIRN membawa pengguna ke portal utama tanpa mengubah data borang.
 
 ## URL aplikasi
 
