@@ -252,3 +252,68 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .datetime-custom { display: flex; flex-wrap: wrap; gap: 8px; }
 .datetime-custom input[type="date"], .datetime-custom input[type="time"] { flex: 1 1 130px; }
 .datetime-custom .dt-note { flex: 1 1 100%; color: var(--muted); font-size: .72rem; margin-top: 2px; }
+
+/* Asthma v1.1 - Laporan PEFR A4 */
+.eyebrow-inline { margin: 0 0 4px; color: var(--teal); font-size: .7rem; font-weight: 900; letter-spacing: .13em; }
+.report-builder-head { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+.report-builder-head h3 { margin: 0; font-size: 1.1rem; }
+.report-builder-head p:last-child { margin: 5px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.4; }
+.report-version { align-self: start; flex: 0 0 auto; padding: 6px 9px; color: var(--teal-dark); background: var(--teal-light); border-radius: 999px; font-size: .72rem; font-weight: 900; }
+.report-filter-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.report-generate { width: 100%; margin-top: 15px; }
+.report-load-status { min-height: 18px; margin: 9px 0 0; color: var(--muted); font-size: .78rem; text-align: center; }
+.pefr-preview-shell { margin-top: 18px; }
+.preview-toolbar { position: sticky; top: 76px; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; padding: 12px; background: rgba(255,255,255,.97); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 24px rgba(4,62,57,.12); }
+.preview-toolbar strong, .preview-toolbar small { display: block; }
+.preview-toolbar small { margin-top: 3px; color: var(--muted); font-size: .72rem; }
+.preview-toolbar .btn { min-height: 42px; }
+.pefr-print-report { width: 297mm; min-height: 210mm; margin: 0 auto; padding: 9mm; overflow: visible; color: #173b38; background: white; border: 1px solid #aebfbc; box-shadow: 0 8px 24px rgba(0,0,0,.13); font-family: Arial, sans-serif; font-size: 9px; }
+.print-report-head { display: flex; align-items: center; gap: 11px; padding-bottom: 8px; border-bottom: 3px solid #117d75; }
+.print-mark { display: grid; place-items: center; flex: 0 0 auto; width: 48px; height: 48px; color: white; background: #117d75; border-radius: 9px; font-weight: 900; }
+.print-report-head small { color: #117d75; font-size: 7px; font-weight: 900; letter-spacing: .1em; }
+.print-report-head h2 { margin: 3px 0; font-size: 17px; }
+.print-report-head p { margin: 0; color: #68817e; }
+.print-report-head dl { display: grid; grid-template-columns: auto auto; gap: 3px 8px; margin: 0 0 0 auto; text-align: right; }
+.print-report-head dt { color: #68817e; }
+.print-report-head dd { margin: 0; font-weight: 800; }
+.print-kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; }
+.print-kpi { padding: 7px; border: 1px solid #cddedb; border-top: 3px solid #117d75; border-radius: 6px; }
+.print-kpi.good { border-top-color: #23986b; }.print-kpi.warn { border-top-color: #d99718; }.print-kpi.bad { border-top-color: #ce5656; }
+.print-kpi span, .print-kpi small { display: block; color: #68817e; }.print-kpi span { font-size: 7px; text-transform: uppercase; }.print-kpi strong { display: block; margin: 2px 0; font-size: 17px; }
+.print-analysis, .print-detail { margin-top: 9px; }
+.print-analysis h3, .print-detail h3, .print-summary h3 { margin: 0 0 5px; padding-bottom: 4px; color: #075b56; border-bottom: 1px solid #cddedb; font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
+.print-analysis-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.print-analysis-card { padding: 7px; background: #edf6f4; border: 1px solid #cddedb; border-radius: 6px; line-height: 1.5; }
+.print-analysis-card strong { font-size: 12px; }.print-analysis-card b { color: #117d75; }
+.print-table-wrap { overflow: visible; }
+.pefr-print-report table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.pefr-print-report th, .pefr-print-report td { padding: 4px 3px; border: 1px solid #c5d5d2; vertical-align: top; line-height: 1.25; overflow-wrap: anywhere; }
+.pefr-print-report th { color: white; background: #117d75; font-size: 7px; }
+.pefr-print-report td { font-size: 7px; }.pefr-print-report tbody tr:nth-child(even) { background: #edf6f4; }
+.pefr-print-report th:nth-child(1){width:8%}.pefr-print-report th:nth-child(2){width:7%}.pefr-print-report th:nth-child(3){width:9%}.pefr-print-report th:nth-child(4){width:7%}.pefr-print-report th:nth-child(5){width:12%}.pefr-print-report th:nth-child(6){width:6%}.pefr-print-report th:nth-child(7),.pefr-print-report th:nth-child(8){width:9%}.pefr-print-report th:nth-child(9){width:7%}.pefr-print-report th:nth-child(10){width:16%}.pefr-print-report th:nth-child(11){width:10%}
+.print-summary { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; margin-top: 10px; break-inside: avoid; }
+.print-summary p { margin: 0; line-height: 1.45; }.print-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 20px; }.print-signatures p { border-top: 1px solid #777; padding-top: 4px; }
+.pefr-print-report footer { margin-top: 9px; color: #68817e; text-align: center; font-size: 7px; }
+
+@media (max-width: 900px) {
+  .pefr-preview-shell { overflow: hidden; }
+  .pefr-print-report { transform: scale(.72); transform-origin: top left; margin-bottom: -59mm; }
+}
+@media (max-width: 640px) {
+  .report-filter-grid { grid-template-columns: 1fr; }
+  .preview-toolbar { top: 70px; align-items: flex-start; }
+  .preview-toolbar .btn { padding: 8px 10px; font-size: .78rem; }
+  .pefr-print-report { transform: scale(.34); margin-bottom: -138mm; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  body { background: white; }
+  body > :not(main), .app-shell > :not(#statsView), #statsView > :not(#pefrReportPreview), .no-print { display: none !important; }
+  .app-shell, #statsView, #pefrReportPreview { display: block !important; width: auto; margin: 0; padding: 0; }
+  .pefr-preview-shell { margin: 0; overflow: visible; }
+  .pefr-print-report { width: auto; min-height: 0; margin: 0; padding: 0; border: 0; box-shadow: none; transform: none; }
+  .print-report-head, .print-kpi-grid, .print-analysis-grid, .print-summary { break-inside: avoid; page-break-inside: avoid; }
+  .pefr-print-report thead { display: table-header-group; }
+  .pefr-print-report tr { break-inside: avoid; page-break-inside: avoid; }
+}
