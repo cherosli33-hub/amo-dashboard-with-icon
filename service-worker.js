@@ -1,14 +1,14 @@
-const CACHE = "amo-etd-lepeh-v24-prosedur-shift-filter";
+const CACHE = "amo-etd-lepeh-v25-asthma-pefr-report";
 const ASSETS = [
   "./",
   "./index.html",
   "./asthma.html",
   "./amo.html",
   "./amo-config.js",
-  "./styles.css?v=19",
+  "./styles.css?v=20",
   "./config.js?v=7",
   "./pefr.mjs",
-  "./asthma.mjs?v=11",
+  "./asthma.mjs?v=12",
   "./manifest.json?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",
