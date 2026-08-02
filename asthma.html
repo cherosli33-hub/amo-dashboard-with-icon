@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.json?v=4">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4">
   <link rel="icon" type="image/png" href="./favicon.png?v=4">
-  <link rel="stylesheet" href="./styles.css?v=5">
+  <link rel="stylesheet" href="./styles.css?v=20">
 </head>
 <body>
   <header class="app-header">
@@ -126,6 +126,34 @@
       <div id="statsGrid" class="stats-grid"></div>
       <div class="card stat-section"><h3>Kategori Before</h3><div id="beforeBars"></div></div>
       <div class="card stat-section"><h3>Kategori After</h3><div id="afterBars"></div></div>
+
+      <section class="card pefr-report-builder no-print">
+        <div class="report-builder-head">
+          <div><p class="eyebrow-inline">LAPORAN AUDIT</p><h3>Laporan PEFR A4</h3><p>Data hanya diminta daripada Google Sheet selepas butang Jana Laporan ditekan.</p></div>
+          <span class="report-version">Asma v1.1</span>
+        </div>
+        <div class="report-filter-grid">
+          <div class="field"><label for="reportPeriodType">Tempoh</label><select id="reportPeriodType"><option value="week">Mingguan</option><option value="month" selected>Bulanan</option></select></div>
+          <div class="field" id="reportWeekField" hidden><label for="reportWeekDate">Tarikh dalam minggu</label><input id="reportWeekDate" type="date"></div>
+          <div class="field" id="reportMonthField"><label for="reportMonth">Bulan</label><input id="reportMonth" type="month"></div>
+          <div class="field"><label for="reportShift">Syif</label><select id="reportShift"><option value="all">Semua syif</option><option value="Pagi">Pagi (07:00–14:00)</option><option value="Petang">Petang (14:00–21:00)</option><option value="Malam">Malam (21:00–07:00)</option></select></div>
+          <div class="field"><label for="reportStatus">Rekod dalam senarai</label><select id="reportStatus"><option value="all">Semua rekod</option><option value="complete">Before + After lengkap</option><option value="notDone">PEFR Not Done</option><option value="uptriage">Kes uptriage</option></select></div>
+        </div>
+        <button id="generatePefrReport" class="btn btn-primary report-generate" type="button">Jana Laporan A4</button>
+        <p id="reportLoadStatus" class="report-load-status" aria-live="polite"></p>
+      </section>
+
+      <section id="pefrReportPreview" class="pefr-preview-shell" hidden>
+        <div class="preview-toolbar no-print"><div><strong>Pratonton A4 Landscape</strong><small id="reportPageHint">Senarai panjang akan bersambung ke muka surat seterusnya.</small></div><button id="printPefrReport" class="btn btn-primary" type="button">Cetak / Simpan PDF</button></div>
+        <article id="pefrPrintReport" class="pefr-print-report">
+          <header class="print-report-head"><div class="print-mark">ETD</div><div><small>KEMENTERIAN KESIHATAN MALAYSIA</small><h2 id="printReportTitle">LAPORAN BULANAN PENILAIAN PEFR ASMA</h2><p>Jabatan Kecemasan dan Trauma · Hospital Kuala Lipis</p></div><dl><dt>Tempoh</dt><dd id="printReportPeriod">—</dd><dt>Syif</dt><dd id="printReportShift">Semua syif</dd><dt>Jumlah rekod</dt><dd id="printReportTotal">0</dd></dl></header>
+          <div class="print-kpi-grid" id="printKpiGrid"></div>
+          <section class="print-analysis"><h3>Analisis pelaksanaan dan hasil PEFR</h3><div id="printAnalysisGrid" class="print-analysis-grid"></div></section>
+          <section class="print-detail"><h3>Senarai bukti penilaian PEFR</h3><div class="print-table-wrap"><table><thead><tr><th>Tarikh / Masa</th><th>IC / RN</th><th>Pesakit</th><th>Umur / Jantina</th><th>Vital Signs</th><th>PEFR Ideal</th><th>PEFR Before</th><th>PEFR After</th><th>Perubahan</th><th>Uptriage / PEFR Not Done</th><th>Nama PPP</th></tr></thead><tbody id="printReportRows"></tbody></table></div></section>
+          <section class="print-summary"><div><h3>Rumusan audit</h3><p id="printAuditSummary"></p></div><div class="print-signatures"><p>Disediakan oleh<br><br>Nama / Tandatangan:</p><p>Disemak oleh<br><br>Nama / Tandatangan:</p></div></section>
+          <footer>Laporan dijana melalui Asthma Dashboard · E.T.D Hospital Kuala Lipis · Asma v1.1</footer>
+        </article>
+      </section>
     </section>
 
     <section id="referenceView" class="view" aria-labelledby="referenceTitle">
@@ -142,6 +170,6 @@
   <dialog id="referenceDialog" class="reference-dialog"><div class="dialog-head"><strong id="dialogTitle">Rujukan</strong><button id="dialogClose" class="dialog-close" type="button" aria-label="Tutup">×</button></div><div class="dialog-image-wrap"><img id="dialogImage" alt=""></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="./config.js?v=7"></script>
-  <script type="module" src="./asthma.mjs?v=11"></script>
+  <script type="module" src="./asthma.mjs?v=12"></script>
 </body>
 </html>
