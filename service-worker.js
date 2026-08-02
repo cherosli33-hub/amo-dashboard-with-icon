@@ -1,4 +1,4 @@
-const CACHE = "amo-etd-lepeh-v20-girn-sheetfix";
+const CACHE = "amo-etd-lepeh-v21-prosedur-operational-day";
 const ASSETS = [
   "./",
   "./index.html",
