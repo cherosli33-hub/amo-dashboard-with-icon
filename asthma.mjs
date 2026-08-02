@@ -424,6 +424,151 @@ function renderStats() {
   renderBars(document.querySelector("#beforeBars"), records, "categoryBefore");
   renderBars(document.querySelector("#afterBars"), records, "categoryAfter");
 }
+
+// ----- Asthma v1.1: laporan PEFR A4 mingguan / bulanan -----
+const reportPeriodType = document.querySelector("#reportPeriodType");
+const reportWeekField = document.querySelector("#reportWeekField");
+const reportMonthField = document.querySelector("#reportMonthField");
+const reportWeekDate = document.querySelector("#reportWeekDate");
+const reportMonth = document.querySelector("#reportMonth");
+const generatePefrReportButton = document.querySelector("#generatePefrReport");
+const reportLoadStatus = document.querySelector("#reportLoadStatus");
+
+function dateFromKey(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12) : null;
+}
+function endOfWeek(date) { const result = startOfWeek(date); result.setDate(result.getDate() + 6); result.setHours(23, 59, 59, 999); return result; }
+function reportShift(record) {
+  const match = String(record.time || "").match(/(\d{1,2})[:.](\d{2})/);
+  if (!match) return "";
+  const hour = Number(match[1]);
+  if (hour >= 7 && hour < 14) return "Pagi";
+  if (hour >= 14 && hour < 21) return "Petang";
+  return "Malam";
+}
+function reportPeriod() {
+  if (reportPeriodType.value === "week") {
+    const picked = dateFromKey(reportWeekDate.value) || new Date();
+    return { type: "week", start: startOfWeek(picked), end: endOfWeek(picked) };
+  }
+  const value = reportMonth.value || localDateKey().slice(0, 7);
+  const [year, month] = value.split("-").map(Number);
+  return { type: "month", start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59, 999) };
+}
+function reportDateLabel(date) { return new Intl.DateTimeFormat("ms-MY", { day: "2-digit", month: "short", year: "numeric" }).format(date); }
+function reportPeriodLabel(period) {
+  return period.type === "week"
+    ? `${reportDateLabel(period.start)} – ${reportDateLabel(period.end)}`
+    : new Intl.DateTimeFormat("ms-MY", { month: "long", year: "numeric" }).format(period.start);
+}
+function recordHasCompletePefr(record) {
+  return !record.pefrNotDone && Number.isFinite(Number(record.pefrBefore)) && Number.isFinite(Number(record.pefrAfter)) && Number.isFinite(Number(record.pefrIdeal));
+}
+function filteredReportRecords(records, period) {
+  const shift = document.querySelector("#reportShift").value;
+  return records.filter(record => {
+    const date = dateFromKey(record.date);
+    return date && date >= period.start && date <= period.end && (shift === "all" || reportShift(record) === shift);
+  }).sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+}
+function reportListRecords(records) {
+  const status = document.querySelector("#reportStatus").value;
+  if (status === "complete") return records.filter(recordHasCompletePefr);
+  if (status === "notDone") return records.filter(record => record.pefrNotDone);
+  if (status === "uptriage") return records.filter(record => record.uptriage && record.uptriage !== "None");
+  return records;
+}
+function reportKpi(label, value, note, tone = "") {
+  return `<div class="print-kpi ${tone}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`;
+}
+function reportCell(value) { return escapeHtml(value === null || value === undefined || value === "" ? "—" : value); }
+function recordVitalText(record) {
+  return [`BP ${record.bp || [record.bpSys, record.bpDia].filter(Boolean).join("/") || "—"}`, `HR ${record.hr ?? "—"} | RR ${record.rr ?? "—"}`, `T ${record.temperature ?? "—"} | SpO₂ ${record.spo2 ?? "—"}`].join("<br>");
+}
+function pefrReading(record, phase) {
+  if (record.pefrNotDone) return "Not Done";
+  const value = record[`pefr${phase}`];
+  const percentage = record[`percentage${phase}`];
+  const category = record[`category${phase}`];
+  return `${reportCell(value)} L/min<br>${Number.isFinite(Number(percentage)) ? Number(percentage).toFixed(1) : "—"}% · ${reportCell(category)}`;
+}
+function renderPefrPrintReport(allRecords, period) {
+  const complete = allRecords.filter(recordHasCompletePefr);
+  const notDone = allRecords.filter(record => record.pefrNotDone).length;
+  const uptriage = allRecords.filter(record => record.uptriage && record.uptriage !== "None").length;
+  const improved = complete.filter(record => Number(record.pefrAfter) > Number(record.pefrBefore)).length;
+  const avgBefore = complete.length ? complete.reduce((sum, record) => sum + Number(record.percentageBefore || 0), 0) / complete.length : 0;
+  const avgAfter = complete.length ? complete.reduce((sum, record) => sum + Number(record.percentageAfter || 0), 0) / complete.length : 0;
+  const completionRate = allRecords.length ? complete.length / allRecords.length * 100 : 0;
+  const improvedRate = complete.length ? improved / complete.length * 100 : 0;
+  const periodLabel = reportPeriodLabel(period);
+  const shiftValue = document.querySelector("#reportShift").value;
+  const listRecords = reportListRecords(allRecords);
+
+  document.querySelector("#printReportTitle").textContent = `LAPORAN ${period.type === "week" ? "MINGGUAN" : "BULANAN"} PENILAIAN PEFR ASMA`;
+  document.querySelector("#printReportPeriod").textContent = periodLabel;
+  document.querySelector("#printReportShift").textContent = shiftValue === "all" ? "Semua syif" : shiftValue;
+  document.querySelector("#printReportTotal").textContent = allRecords.length;
+  document.querySelector("#printKpiGrid").innerHTML = [
+    reportKpi("Rekod asma", allRecords.length, "Jumlah tempoh dipilih"),
+    reportKpi("PEFR dibuat", allRecords.length - notDone, `${allRecords.length ? ((allRecords.length - notDone) / allRecords.length * 100).toFixed(1) : "0.0"}% pesakit`, "good"),
+    reportKpi("Before + After lengkap", complete.length, `${completionRate.toFixed(1)}% pematuhan`, "good"),
+    reportKpi("PEFR tidak dibuat", notDone, `${allRecords.length ? (notDone / allRecords.length * 100).toFixed(1) : "0.0"}% pesakit`, "warn"),
+    reportKpi("Bacaan meningkat", improved, `${improvedRate.toFixed(1)}% rekod lengkap`, "good"),
+    reportKpi("Uptriage", uptriage, `${allRecords.length ? (uptriage / allRecords.length * 100).toFixed(1) : "0.0"}% rekod`, "bad")
+  ].join("");
+  document.querySelector("#printAnalysisGrid").innerHTML = [
+    `<div class="print-analysis-card"><strong>Purata PEFR</strong><br>Sebelum <b>${avgBefore.toFixed(1)}%</b> → Selepas <b>${avgAfter.toFixed(1)}%</b><br>Perubahan <b>${avgAfter >= avgBefore ? "+" : ""}${(avgAfter - avgBefore).toFixed(1)}</b> mata peratus</div>`,
+    `<div class="print-analysis-card"><strong>Perubahan kategori</strong><br>Mild: ${countCategory(complete, "categoryBefore", "Mild")} → <b>${countCategory(complete, "categoryAfter", "Mild")}</b><br>Moderate: ${countCategory(complete, "categoryBefore", "Moderate")} → <b>${countCategory(complete, "categoryAfter", "Moderate")}</b><br>Severe: ${countCategory(complete, "categoryBefore", "Severe")} → <b>${countCategory(complete, "categoryAfter", "Severe")}</b></div>`,
+    `<div class="print-analysis-card"><strong>Status dokumentasi</strong><br>Lengkap: <b>${complete.length}</b><br>Not Done dengan sebab: <b>${allRecords.filter(record => record.pefrNotDone && record.notDoneReason).length}</b><br>Senarai dipaparkan: <b>${listRecords.length}</b></div>`
+  ].join("");
+  document.querySelector("#printReportRows").innerHTML = listRecords.length ? listRecords.map(record => {
+    const change = recordHasCompletePefr(record) ? Number(record.pefrAfter) - Number(record.pefrBefore) : null;
+    const action = record.pefrNotDone ? `PEFR Not Done<br>${reportCell(record.notDoneReason)}${record.notDoneOther ? `<br>${reportCell(record.notDoneOther)}` : ""}` : (record.uptriage === "None" ? "Tiada" : reportCell(record.uptriage));
+    return `<tr><td>${reportCell(record.date)}<br>${reportCell(record.time)}</td><td>${reportCell(record.patientId)}</td><td>${record.patientType === "adult" ? "Dewasa" : "Pediatrik"}<br>${reportCell(record.patientName)}</td><td>${reportCell(record.age)} thn / ${record.sex === "female" ? "Perempuan" : "Lelaki"}</td><td>${recordVitalText(record)}</td><td>${reportCell(record.pefrIdeal)}</td><td>${pefrReading(record, "Before")}</td><td>${pefrReading(record, "After")}</td><td>${change === null ? "—" : `${change >= 0 ? "+" : ""}${change} L/min`}</td><td>${action}</td><td>${reportCell(record.pppName)}</td></tr>`;
+  }).join("") : '<tr><td colspan="11" style="text-align:center;padding:18px">Tiada rekod bagi pilihan ini.</td></tr>';
+  document.querySelector("#printAuditSummary").innerHTML = allRecords.length
+    ? `<b>${complete.length} daripada ${allRecords.length} rekod (${completionRate.toFixed(1)}%)</b> mempunyai bacaan PEFR Before dan After lengkap. Daripada rekod lengkap, <b>${improved} kes (${improvedRate.toFixed(1)}%)</b> menunjukkan peningkatan selepas rawatan. ${notDone} rekod PEFR tidak dibuat dan ${uptriage} kes direkodkan uptriage.`
+    : "Tiada rekod bagi tempoh dan syif yang dipilih.";
+  document.querySelector("#reportPageHint").textContent = `${listRecords.length} rekod dipaparkan. Senarai panjang akan bersambung ke muka surat seterusnya.`;
+  document.querySelector("#pefrReportPreview").hidden = false;
+}
+async function generatePefrReport() {
+  const originalText = generatePefrReportButton.textContent;
+  generatePefrReportButton.disabled = true;
+  generatePefrReportButton.textContent = "Mengambil data…";
+  reportLoadStatus.textContent = "Meminta rekod terkini daripada Google Sheet…";
+  try {
+    const response = await sheetRequest("listAsthmaAssessments");
+    if (!response?.ok) throw new Error(response?.error || "Gagal membaca data Google Sheet.");
+    const records = Array.isArray(response.records) ? response.records : [];
+    sharedRecords = records;
+    const period = reportPeriod();
+    const selected = filteredReportRecords(records, period);
+    renderPefrPrintReport(selected, period);
+    reportLoadStatus.textContent = `${selected.length} rekod diterima dan laporan siap dipratonton.`;
+    document.querySelector("#pefrReportPreview").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    reportLoadStatus.textContent = error.message;
+    showToast(error.message);
+  } finally {
+    generatePefrReportButton.disabled = false;
+    generatePefrReportButton.textContent = originalText;
+  }
+}
+function initPefrReport() {
+  const today = new Date();
+  reportWeekDate.value = localDateKey(today);
+  reportMonth.value = localDateKey(today).slice(0, 7);
+  reportPeriodType.addEventListener("change", () => {
+    const weekly = reportPeriodType.value === "week";
+    reportWeekField.hidden = !weekly;
+    reportMonthField.hidden = weekly;
+  });
+  generatePefrReportButton.addEventListener("click", generatePefrReport);
+  document.querySelector("#printPefrReport").addEventListener("click", () => window.print());
+}
 function setView(viewId) {
   document.querySelectorAll(".view").forEach(view => view.classList.toggle("is-active", view.id === viewId));
   document.querySelectorAll(".nav-button").forEach(button => button.classList.toggle("is-active", button.dataset.view === viewId));
@@ -479,6 +624,7 @@ referenceDialog.addEventListener("click", event => { if (event.target === refere
 populatePaediatricHeights();
 setAssessmentTime();
 initDateControls();
+initPefrReport();
 syncNotice.hidden = Boolean(endpoint());
 if (!endpoint()) { syncNotice.hidden = false; syncNotice.textContent = "Google Sheet belum disambungkan. Rekod hanya boleh disimpan sementara pada peranti ini."; }
 updateNotDoneMode();
