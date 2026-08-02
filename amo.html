@@ -263,7 +263,7 @@ const BASE_URL = window.AMO_CONFIG.apiUrl;
 const DATA_URL = BASE_URL + "?action=data";
 
 const SHIFTS = [
-  { id: "morning", label: "Pagi", time: "07:30 - 14:00", color: "var(--pagi)", hex: "#F2A93B", glow: "var(--pagi-glow)" },
+  { id: "morning", label: "Pagi", time: "07:00 - 14:00", color: "var(--pagi)", hex: "#F2A93B", glow: "var(--pagi-glow)" },
   { id: "evening", label: "Petang", time: "14:00 – 21:00", color: "var(--petang)", hex: "#E2622E", glow: "var(--petang-glow)" },
   { id: "night", label: "Malam", time: "21:00 - 07:30", color: "var(--malam)", hex: "#5B7FE0", glow: "var(--malam-glow)" },
 ];
@@ -292,14 +292,26 @@ function defaultDurationIdForProcedure(name){
 }
 
 function shiftMeta(id){ return SHIFTS.find(s => s.id === id); }
-function todayKey(){
-  const d = new Date();
+function calendarDateKey(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
+function operationalDate(d = new Date()){
+  const result = new Date(d);
+  if(result.getHours() < 7) result.setDate(result.getDate() - 1);
+  return result;
+}
+function todayKey(){
+  return calendarDateKey(operationalDate());
+}
+function dateKeyForShift(d, shiftId){
+  const result = new Date(d);
+  if(shiftId === "night" && result.getHours() < 7) result.setDate(result.getDate() - 1);
+  return calendarDateKey(result);
+}
 function dateKeyOffset(daysAgo){
-  const d = new Date();
+  const d = operationalDate();
   d.setDate(d.getDate() - daysAgo);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  return calendarDateKey(d);
 }
 function visibleTrendDateKeys(){
   const keys = new Set();
@@ -484,9 +496,9 @@ function renderDashboard(){
   // 7-day trend
   const days = [];
   for(let i=6;i>=0;i--){
-    const d = new Date();
+    const d = operationalDate();
     d.setDate(d.getDate()-i);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const key = calendarDateKey(d);
     const count = state.cases.filter(c => c.date === key).reduce((sum,c) => sum + c.procedures.length, 0);
     days.push({ label: d.toLocaleDateString("ms-MY",{weekday:"short"}).slice(0,3), count, isToday: key === today });
   }
@@ -916,15 +928,15 @@ renderDashboard = function(){
   const maxZoneProcedures = Math.max(...zoneRows.map(z => z.procedures), 1);
   const days = [];
   for(let i=6;i>=0;i--){
-    const d = new Date();
+    const d = operationalDate();
     d.setDate(d.getDate()-i);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    const key = calendarDateKey(d);
     const count = state.cases.filter(c => c.date === key).reduce((sum,c) => sum + c.procedures.length, 0);
     days.push({ label: d.toLocaleDateString("ms-MY",{weekday:"short"}).slice(0,3), count, isToday: key === today });
   }
   const maxDay = Math.max(...days.map(d=>d.count), 1);
   const minutesNow = now.getHours() * 60 + now.getMinutes();
-  const currentShiftId = (minutesNow>=450 && minutesNow<840) ? "morning" : (minutesNow>=840 && minutesNow<1260) ? "evening" : "night";
+  const currentShiftId = (minutesNow>=420 && minutesNow<840) ? "morning" : (minutesNow>=840 && minutesNow<1260) ? "evening" : "night";
   const total = Math.max(shiftCount.morning + shiftCount.evening + shiftCount.night, 1);
   const R = 72, CIRC = 2*Math.PI*R, gapLen = (6/360)*CIRC;
   let cursor = 0;
@@ -1062,7 +1074,7 @@ handleSaveCase = function(){
   }
   const newCase = {
     id: `case_${now.getTime()}_${Math.random().toString(36).slice(2,7)}`,
-    date: todayKey(),
+    date: dateKeyForShift(now, state.selectedShift),
     time: now.toLocaleTimeString("ms-MY",{hour:"2-digit",minute:"2-digit"}),
     shift: state.selectedShift,
     zone: state.selectedZone,
