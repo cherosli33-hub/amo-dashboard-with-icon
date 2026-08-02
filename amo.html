@@ -373,6 +373,7 @@ let state = {
   cases: [],
   dashboardDate: todayKey(),
   dashboardTab: "summary", // summary | records
+  recordShiftFilter: "all", // all | morning | evening | night
   view: "dashboard", // dashboard | newcase
   step: 1,
   selectedShift: null,
@@ -896,6 +897,16 @@ function setDashboardTab(tab){
   renderDashboard();
 }
 
+function setRecordShiftFilter(shiftId){
+  state.recordShiftFilter = ["morning","evening","night"].includes(shiftId) ? shiftId : "all";
+  renderDashboard();
+}
+
+function recordShiftFiltersHtml(){
+  const options = [{id:"all",label:"Semua"}, ...SHIFTS.map(shift => ({id:shift.id,label:shift.label}))];
+  return `<div class="record-shift-filters" role="group" aria-label="Tapis rekod mengikut shift">${options.map(option => `<button type="button" class="record-shift-filter ${state.recordShiftFilter === option.id ? "active" : ""}" onclick="setRecordShiftFilter('${option.id}')">${option.label}</button>`).join("")}</div>`;
+}
+
 function dashboardTabsHtml(activeTab){
   return `<nav class="dashboard-tabs" aria-label="Paparan Prosedur">
     <button type="button" class="dashboard-tab ${activeTab === "summary" ? "active" : ""}" onclick="setDashboardTab('summary')">Dashboard</button>
@@ -906,7 +917,8 @@ function dashboardTabsHtml(activeTab){
 function dailyRecordsHtml(todayCases, now){
   const operationDate = operationalDate(now);
   const dateLabel = operationDate.toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric" });
-  const shiftSections = SHIFTS.map(shift => {
+  const visibleShifts = state.recordShiftFilter === "all" ? SHIFTS : SHIFTS.filter(shift => shift.id === state.recordShiftFilter);
+  const shiftSections = visibleShifts.map(shift => {
     const cases = todayCases
       .filter(item => item.shift === shift.id)
       .slice()
@@ -935,6 +947,7 @@ function dailyRecordsHtml(todayCases, now){
   }).join("");
   return `<div class="header"><div><div class="date">HARI OPERASI · ${esc(dateLabel)}</div><h1>Rekod Prosedur Hari Ini</h1></div><div class="icon"><img src="./prosedur-icon.png?v=2.6.0" alt="Logo Log Prosedur A.M.O"></div></div>
     ${dashboardTabsHtml("records")}
+    ${recordShiftFiltersHtml()}
     <div class="daily-operation-note">Paparan ini meliputi 7:00 pagi hingga 7:00 pagi hari berikutnya dan bertukar secara automatik pada 7:00 pagi.</div>
     ${shiftSections}`;
 }
@@ -945,6 +958,9 @@ function dailyRecordsHtml(todayCases, now){
     .dashboard-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;margin:-8px 0 22px;background:var(--chip);border:1px solid var(--border);border-radius:12px}
     .dashboard-tab{padding:10px 8px;border-radius:8px;color:var(--muted2);font-size:14px;font-weight:600}
     .dashboard-tab.active{background:var(--panel);color:var(--accent);box-shadow:0 2px 8px rgba(28,36,32,.08)}
+    .record-shift-filters{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:-10px 0 16px}
+    .record-shift-filter{padding:9px 5px;border:1px solid var(--border);border-radius:9px;background:var(--panel);color:var(--muted2);font-size:12px;font-weight:600}
+    .record-shift-filter.active{border-color:var(--accent);background:var(--accent);color:#fff}
     .daily-operation-note{padding:12px 14px;margin-bottom:18px;border:1px solid #bfe5d4;border-radius:12px;background:#edf9f3;color:#246347;font-size:13px;line-height:1.45}
     .daily-shift-section{margin-bottom:22px}
     .daily-shift-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
