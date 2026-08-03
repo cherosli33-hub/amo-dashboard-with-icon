@@ -1,4 +1,7 @@
-export const APP_VERSION = "2.6.1";
+export const APP_VERSION = "2.7.0-supervisor";
+// Isi selepas OAuth Web Client dibuat. Nilai yang sama mesti disimpan sebagai
+// GOOGLE_OAUTH_CLIENT_ID dalam Apps Script > Project Settings > Script Properties.
+export const GOOGLE_OAUTH_CLIENT_ID = "";
 
 // Isi URL deployment Google Apps Script selepas Sheet produksi dipasang
 // dalam akaun Google pemilik sistem.
