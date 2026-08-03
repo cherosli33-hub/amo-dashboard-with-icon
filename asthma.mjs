@@ -1,6 +1,9 @@
 import { PAEDIATRIC_PEFR, predictedAdultPef, predictedPaediatricPef, pefrPercentage, classifyPercentage } from "./pefr.mjs";
 
 const PENDING_KEY = "amo-etd-asthma-pending-v2";
+const DRAFT_KEY = "amo-etd-asthma-draft-v1";
+const PATIENT_HISTORY_KEY = "amo-etd-asthma-patient-history-v1";
+const PATIENT_HISTORY_LIMIT = 500;
 const form = document.querySelector("#assessmentForm");
 const patientTypeInputs = [...document.querySelectorAll('input[name="patientType"]')];
 const uptriageInputs = [...document.querySelectorAll('input[name="uptriage"]')];
@@ -35,6 +38,7 @@ let state = { ideal: null, beforePercentage: null, afterPercentage: null };
 let sharedRecords = [];
 let formDirty = false;
 let pendingSyncPromise = null;
+let draftTimer = null;
 
 function endpoint() { return window.ASTHMA_CONFIG?.sheetEndpoint?.trim() || ""; }
 function requestTimeout() { return Number(window.ASTHMA_CONFIG?.requestTimeoutMs) || 15000; }
@@ -114,6 +118,88 @@ function isPefrNotDone() { return pefrNotDoneInput.checked; }
 function selectedNotDoneReason() { return notDoneReasonInputs.find(input => input.checked)?.value ?? ""; }
 function selectedUptriage() { return uptriageInputs.find(input => input.checked)?.value ?? "None"; }
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[c]); }
+
+function getPatientHistory() {
+  try {
+    const value = JSON.parse(localStorage.getItem(PATIENT_HISTORY_KEY) || "{}");
+    return {
+      names: Array.isArray(value.names) ? value.names : [],
+      ids: Array.isArray(value.ids) ? value.ids : []
+    };
+  } catch { return { names: [], ids: [] }; }
+}
+function uniqueRecent(values) {
+  const seen = new Set();
+  return values.filter(value => {
+    const cleaned = String(value || "").trim();
+    const key = cleaned.toLocaleLowerCase("ms");
+    if (!cleaned || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, PATIENT_HISTORY_LIMIT);
+}
+function renderPatientSuggestions() {
+  const history = getPatientHistory();
+  document.querySelector("#patientNameSuggestions").replaceChildren(...history.names.map(value => Object.assign(document.createElement("option"), { value })));
+  document.querySelector("#patientIdSuggestions").replaceChildren(...history.ids.map(value => Object.assign(document.createElement("option"), { value })));
+}
+function rememberPatient(record) {
+  const history = getPatientHistory();
+  history.names = uniqueRecent([record.patientName, ...history.names]);
+  history.ids = uniqueRecent([record.patientId, ...history.ids]);
+  localStorage.setItem(PATIENT_HISTORY_KEY, JSON.stringify(history));
+  renderPatientSuggestions();
+}
+function draftSnapshot() {
+  const fields = {};
+  [...form.elements].forEach(control => {
+    if (!control.name || control.disabled || control.type === "submit" || control.type === "button") return;
+    if (control.type === "radio") {
+      if (control.checked) fields[control.name] = control.value;
+    } else if (control.type === "checkbox") fields[control.name] = control.checked;
+    else fields[control.name] = control.value;
+  });
+  return {
+    fields,
+    dateMode,
+    customDate: document.querySelector("#customDate").value,
+    customTime: document.querySelector("#customTime").value,
+    savedAt: new Date().toISOString()
+  };
+}
+function saveDraft() {
+  if (!formDirty) return;
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draftSnapshot())); } catch { /* storage unavailable */ }
+}
+function scheduleDraftSave() {
+  window.clearTimeout(draftTimer);
+  draftTimer = window.setTimeout(saveDraft, 400);
+}
+function clearDraft() {
+  window.clearTimeout(draftTimer);
+  localStorage.removeItem(DRAFT_KEY);
+}
+function restoreDraft() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch { return; }
+  if (!draft?.fields) return;
+  Object.entries(draft.fields).forEach(([name, value]) => {
+    const controls = [...form.elements].filter(control => control.name === name);
+    controls.forEach(control => {
+      if (control.type === "radio") control.checked = control.value === value;
+      else if (control.type === "checkbox") control.checked = Boolean(value);
+      else control.value = value ?? "";
+    });
+  });
+  if (draft.dateMode === "other") {
+    document.querySelector("#customDate").value = draft.customDate || "";
+    document.querySelector("#customTime").value = draft.customTime || "";
+    document.querySelector("#dtOther").click();
+  }
+  formDirty = true;
+  updateNotDoneMode();
+  calculateAll();
+}
 
 function populatePaediatricHeights() {
   Object.entries(PAEDIATRIC_PEFR).forEach(([height, pefr]) => {
@@ -364,6 +450,7 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 3500);
 }
 function resetForm() {
+  clearDraft();
   form.reset();
   document.querySelector('input[name="patientType"][value="adult"]').checked = true;
   document.querySelector('input[name="uptriage"][value="None"]').checked = true;
@@ -576,12 +663,13 @@ function setView(viewId) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-form.addEventListener("input", () => { formDirty = true; calculateAll(); });
+form.addEventListener("input", () => { formDirty = true; calculateAll(); scheduleDraftSave(); });
 form.addEventListener("change", event => {
   formDirty = true;
   if (event.target.name === "patientType") updatePatientType();
   if (event.target.name === "uptriage") renderSummary();
   if (event.target.name === "pefrNotDone" || event.target.name === "notDoneReason") updateNotDoneMode();
+  scheduleDraftSave();
 });
 form.addEventListener("submit", event => {
   event.preventDefault();
@@ -590,6 +678,7 @@ form.addEventListener("submit", event => {
   const record = makeRecord();
   try {
     addPending(record);
+    rememberPatient(record);
   } catch {
     showToast("Rekod tidak dapat disimpan dalam telefon. Sila cuba semula.");
     return;
@@ -603,6 +692,8 @@ form.addEventListener("submit", event => {
 
 document.querySelector("#resetButton").addEventListener("click", resetForm);
 document.querySelector("#recordSearch").addEventListener("input", renderRecords);
+document.querySelector("#recordSearch").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); renderRecords(); } });
+document.querySelector("#searchRecords").addEventListener("click", renderRecords);
 document.querySelector("#refreshRecords").addEventListener("click", () => loadSharedRecords(true));
 document.querySelector("#refreshStats").addEventListener("click", () => loadSharedRecords(true));
 document.querySelector("#statsRange").addEventListener("change", renderStats);
@@ -625,6 +716,8 @@ populatePaediatricHeights();
 setAssessmentTime();
 initDateControls();
 initPefrReport();
+renderPatientSuggestions();
+restoreDraft();
 syncNotice.hidden = Boolean(endpoint());
 if (!endpoint()) { syncNotice.hidden = false; syncNotice.textContent = "Google Sheet belum disambungkan. Rekod hanya boleh disimpan sementara pada peranti ini."; }
 updateNotDoneMode();

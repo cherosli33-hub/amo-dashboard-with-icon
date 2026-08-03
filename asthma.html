@@ -37,8 +37,8 @@
             </div>
           </div>
           <div class="form-grid" style="margin-top:13px">
-            <div class="field full"><label for="patientName">Nama pesakit <small>(pilihan)</small></label><input id="patientName" name="patientName" autocomplete="off" maxlength="80"></div>
-            <div class="field full"><label for="patientId">No. IC / RN</label><input id="patientId" name="patientId" required autocomplete="off" maxlength="40"></div>
+            <div class="field full"><label for="patientName">Nama pesakit <small>(pilihan)</small></label><input id="patientName" name="patientName" list="patientNameSuggestions" autocomplete="off" maxlength="80"><datalist id="patientNameSuggestions"></datalist></div>
+            <div class="field full"><label for="patientId">No. IC / RN</label><input id="patientId" name="patientId" list="patientIdSuggestions" required autocomplete="off" maxlength="40"><datalist id="patientIdSuggestions"></datalist></div>
             <div class="field"><label for="age">Umur</label><div class="unit-field"><input id="age" name="age" type="number" min="15" max="85" step="1" required><span class="unit">tahun</span></div><small id="ageHelp">Formula dewasa sah untuk umur 15–85 tahun.</small></div>
             <div class="field"><label for="sex">Jantina</label><select id="sex" name="sex" required><option value="">Pilih</option><option value="male">Lelaki</option><option value="female">Perempuan</option></select></div>
             <div class="field full" id="adultHeightField"><label for="heightAdult">Tinggi</label><div class="unit-field"><input id="heightAdult" name="heightAdult" type="number" min="120" max="210" step="1" required><span class="unit">cm</span></div></div>
@@ -116,7 +116,7 @@
 
     <section id="todayView" class="view" aria-labelledby="todayTitle">
       <div class="section-heading"><h2 id="todayTitle">Penilaian hari ini</h2><p>Rekod bersama daripada Google Sheet untuk semua peranti.</p></div>
-      <div class="filter-row"><input id="recordSearch" type="search" placeholder="Cari IC / RN"><button id="refreshRecords" class="btn btn-secondary" type="button">Muat semula</button></div>
+      <div class="filter-row record-search-row"><input id="recordSearch" type="search" placeholder="Cari IC / RN"><button id="searchRecords" class="btn btn-primary" type="button">Cari</button><button id="refreshRecords" class="btn btn-secondary" type="button">Muat semula</button></div>
       <div id="recordList" class="record-list"></div>
     </section>
 
@@ -170,6 +170,6 @@
   <dialog id="referenceDialog" class="reference-dialog"><div class="dialog-head"><strong id="dialogTitle">Rujukan</strong><button id="dialogClose" class="dialog-close" type="button" aria-label="Tutup">×</button></div><div class="dialog-image-wrap"><img id="dialogImage" alt=""></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="./config.js?v=7"></script>
-  <script type="module" src="./asthma.mjs?v=12"></script>
+  <script type="module" src="./asthma.mjs?v=13"></script>
 </body>
 </html>
