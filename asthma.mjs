@@ -337,7 +337,7 @@ function makeRecord() {
   };
 }
 
-function sheetRequest(action, { method = "GET", record = null } = {}) {
+function sheetRequest(action, { method = "GET", record = null, params = {} } = {}) {
   return new Promise((resolve, reject) => {
     if (!endpoint()) { reject(new Error("Google Sheet belum disambungkan.")); return; }
     const requestId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -374,6 +374,7 @@ function sheetRequest(action, { method = "GET", record = null } = {}) {
     url.searchParams.set("action", action);
     url.searchParams.set("transport", "iframe");
     url.searchParams.set("requestId", requestId);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
 
     if (method === "POST") {
       formElement = document.createElement("form");
@@ -510,6 +511,37 @@ function renderStats() {
   document.querySelector("#statsGrid").innerHTML = [["Jumlah penilaian", records.length], ["Dewasa", adults], ["Pediatrik", records.length - adults], ["Uptriage Yellow", yellow], ["Uptriage Red", red], ["PEFR Not Done", notDone]].map(([label, value]) => `<div class="stat-card"><small>${label}</small><strong>${value}</strong></div>`).join("");
   renderBars(document.querySelector("#beforeBars"), records, "categoryBefore");
   renderBars(document.querySelector("#afterBars"), records, "categoryAfter");
+}
+
+function patientLookupMarkup(record) {
+  const patientTypeLabel = record.patientType === "paediatric" ? "Pediatrik" : "Dewasa";
+  const sexLabel = record.sex === "female" ? "Perempuan" : "Lelaki";
+  const recordedAt = [record.date ? displayDate(new Date(`${record.date}T12:00:00`)) : "—", record.time || ""].filter(Boolean).join(" · ");
+  return `<article class="patient-lookup-card"><h3>${escapeHtml(record.patientName || "Nama tidak direkodkan")}</h3><small>${escapeHtml(record.patientId)}</small><dl class="patient-detail-list"><div><dt>Umur ketika direkodkan</dt><dd>${record.age ?? "—"}${record.age !== null && record.age !== undefined ? " tahun" : ""}</dd></div><div><dt>Tinggi terakhir</dt><dd>${record.height ?? "—"}${record.height !== null && record.height !== undefined ? " cm" : ""}</dd></div><div><dt>Jantina</dt><dd>${sexLabel}</dd></div><div><dt>Kategori</dt><dd>${patientTypeLabel}</dd></div><div><dt>Rekod terakhir</dt><dd>${escapeHtml(recordedAt)}</dd></div></dl><p class="lookup-warning">Maklumat ini berdasarkan rekod terakhir. Sila sahkan semula umur dan tinggi dengan pesakit.</p></article>`;
+}
+async function lookupPatient() {
+  const input = document.querySelector("#patientLookupId");
+  const button = document.querySelector("#patientLookupButton");
+  const result = document.querySelector("#patientLookupResult");
+  const patientId = input.value.trim();
+  if (!patientId) { result.innerHTML = '<div class="empty-state">Masukkan No. IC/RN terlebih dahulu.</div>'; input.focus(); return; }
+  button.disabled = true;
+  button.textContent = "Mencari…";
+  result.innerHTML = '<div class="empty-state">Sedang mencari rekod terkini…</div>';
+  try {
+    const response = await sheetRequest("listAsthmaAssessments");
+    if (!response?.ok) throw new Error(response?.error || "Carian gagal.");
+    const wanted = patientId.toLocaleLowerCase("ms");
+    const record = (Array.isArray(response.records) ? response.records : [])
+      .filter(item => String(item.patientId || "").trim().toLocaleLowerCase("ms") === wanted)
+      .sort((a, b) => String(b.timestamp || `${b.date}T${b.time}`).localeCompare(String(a.timestamp || `${a.date}T${a.time}`)))[0];
+    result.innerHTML = record ? patientLookupMarkup(record) : '<div class="empty-state">Tiada rekod sepadan ditemui.</div>';
+  } catch (error) {
+    result.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Cari Pesakit";
+  }
 }
 
 // ----- Asthma v1.1: laporan PEFR A4 mingguan / bulanan -----
@@ -694,6 +726,8 @@ document.querySelector("#resetButton").addEventListener("click", resetForm);
 document.querySelector("#recordSearch").addEventListener("input", renderRecords);
 document.querySelector("#recordSearch").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); renderRecords(); } });
 document.querySelector("#searchRecords").addEventListener("click", renderRecords);
+document.querySelector("#patientLookupButton").addEventListener("click", lookupPatient);
+document.querySelector("#patientLookupId").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); void lookupPatient(); } });
 document.querySelector("#refreshRecords").addEventListener("click", () => loadSharedRecords(true));
 document.querySelector("#refreshStats").addEventListener("click", () => loadSharedRecords(true));
 document.querySelector("#statsRange").addEventListener("change", renderStats);

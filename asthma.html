@@ -9,7 +9,7 @@
   <link rel="manifest" href="./manifest.json?v=4">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4">
   <link rel="icon" type="image/png" href="./favicon.png?v=4">
-  <link rel="stylesheet" href="./styles.css?v=20">
+  <link rel="stylesheet" href="./styles.css?v=21">
 </head>
 <body>
   <header class="app-header">
@@ -120,6 +120,13 @@
       <div id="recordList" class="record-list"></div>
     </section>
 
+    <section id="patientLookupView" class="view" aria-labelledby="patientLookupTitle">
+      <div class="section-heading"><h2 id="patientLookupTitle">Semakan pesakit</h2><p>Cari maklumat daripada rekod penilaian Asma yang paling terkini.</p></div>
+      <div class="filter-row"><input id="patientLookupId" type="search" placeholder="Masukkan No. IC / RN" maxlength="40" autocomplete="off"><button id="patientLookupButton" class="btn btn-primary" type="button">Cari Pesakit</button></div>
+      <p class="lookup-privacy-note">Carian hanya bermula selepas butang ditekan. Gunakan No. IC/RN yang tepat.</p>
+      <div id="patientLookupResult" aria-live="polite"><div class="empty-state">Masukkan No. IC/RN untuk membuat semakan.</div></div>
+    </section>
+
     <section id="statsView" class="view" aria-labelledby="statsTitle">
       <div class="section-heading"><h2 id="statsTitle">Statistik PEFR</h2><p>Ringkasan bersama daripada Google Sheet.</p></div>
       <div class="filter-row"><select id="statsRange"><option value="today">Hari ini</option><option value="yesterday">Semalam</option><option value="week">Minggu ini</option><option value="month">Bulan ini</option><option value="all">Semua</option></select><button id="refreshStats" class="btn btn-secondary" type="button">Muat semula</button></div>
@@ -166,10 +173,10 @@
     </section>
   </main>
 
-  <nav class="bottom-nav" aria-label="Menu dashboard"><button class="nav-button is-active" data-view="newView"><span>＋</span>Penilaian</button><button class="nav-button" data-view="todayView"><span>▤</span>Hari ini</button><button class="nav-button" data-view="statsView"><span>▥</span>Statistik</button><button class="nav-button" data-view="referenceView"><span>▣</span>Rujukan</button></nav>
+  <nav class="bottom-nav" aria-label="Menu dashboard"><button class="nav-button is-active" data-view="newView"><span>＋</span>Penilaian</button><button class="nav-button" data-view="todayView"><span>▤</span>Hari ini</button><button class="nav-button" data-view="patientLookupView"><span>⌕</span>Semakan</button><button class="nav-button" data-view="statsView"><span>▥</span>Statistik</button><button class="nav-button" data-view="referenceView"><span>▣</span>Rujukan</button></nav>
   <dialog id="referenceDialog" class="reference-dialog"><div class="dialog-head"><strong id="dialogTitle">Rujukan</strong><button id="dialogClose" class="dialog-close" type="button" aria-label="Tutup">×</button></div><div class="dialog-image-wrap"><img id="dialogImage" alt=""></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="./config.js?v=7"></script>
-  <script type="module" src="./asthma.mjs?v=13"></script>
+  <script type="module" src="./asthma.mjs?v=14"></script>
 </body>
 </html>

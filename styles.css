@@ -212,10 +212,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .dialog-image-wrap { max-height: calc(94svh - 68px); overflow: auto; background: #172524; }
 .dialog-image-wrap img { display: block; width: 100%; min-width: min(760px, 100%); height: auto; margin: auto; }
 
-.bottom-nav { position: fixed; z-index: 30; left: 50%; bottom: 0; transform: translateX(-50%); display: grid; grid-template-columns: repeat(4, 1fr); width: min(100%, 900px); padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.97); border-top: 1px solid var(--line); box-shadow: 0 -8px 28px rgba(0,45,42,.1); backdrop-filter: blur(12px); }
+.bottom-nav { position: fixed; z-index: 30; left: 50%; bottom: 0; transform: translateX(-50%); display: grid; grid-template-columns: repeat(5, 1fr); width: min(100%, 900px); padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.97); border-top: 1px solid var(--line); box-shadow: 0 -8px 28px rgba(0,45,42,.1); backdrop-filter: blur(12px); }
 .nav-button { min-height: 53px; padding: 5px 3px; color: #6a7e7e; background: transparent; border: 0; border-radius: 11px; font-size: .68rem; font-weight: 800; }
 .nav-button span { display: block; margin-bottom: 3px; font-size: 1.15rem; }
 .nav-button.is-active { color: var(--teal); background: var(--teal-light); }
+.lookup-privacy-note { margin: -4px 0 14px; color: var(--muted); font-size: .78rem; }
+.patient-lookup-card { padding: 18px; background: white; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 7px 20px rgba(4,62,57,.05); }
+.patient-lookup-card h3 { margin: 0; font-size: 1.12rem; }
+.patient-lookup-card > small { display: block; margin-top: 4px; color: var(--muted); }
+.patient-detail-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0 0; }
+.patient-detail-list div { padding: 12px; background: #f2f8f7; border-radius: 13px; }
+.patient-detail-list dt { color: var(--muted); font-size: .76rem; }
+.patient-detail-list dd { margin: 5px 0 0; font-weight: 850; }
+.lookup-warning { margin: 14px 0 0; padding: 11px 12px; color: #6d5200; background: #fff8d8; border-radius: 12px; font-size: .8rem; }
 .toast { position: fixed; z-index: 50; left: 50%; bottom: calc(82px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); width: min(calc(100% - 28px), 480px); padding: 13px 16px; color: white; background: #173f3d; border-radius: 13px; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: .22s ease; }
 .toast.is-visible { transform: translate(-50%, 0); opacity: 1; }
 
@@ -227,6 +236,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .reference-card small { padding-bottom: 12px; }
   .ideal-card { grid-template-columns: 1fr; }
   .ideal-method { text-align: left; }
+  .patient-detail-list { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 390px) {

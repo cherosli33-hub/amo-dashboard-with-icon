@@ -1,14 +1,14 @@
-const CACHE = "amo-etd-lepeh-v26-asthma-search-draft";
+const CACHE = "amo-etd-lepeh-v27-asthma-patient-lookup";
 const ASSETS = [
   "./",
   "./index.html",
   "./asthma.html",
   "./amo.html",
   "./amo-config.js",
-  "./styles.css?v=20",
+  "./styles.css?v=21",
   "./config.js?v=7",
   "./pefr.mjs",
-  "./asthma.mjs?v=13",
+  "./asthma.mjs?v=14",
   "./manifest.json?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",
