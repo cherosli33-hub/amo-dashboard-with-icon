@@ -1,5 +1,5 @@
-const CACHE = "phc-production-v18";
-const ASSETS = ["./", "./index.html", "./inspection.html", "./records.html", "./settings.html", "./css/style.css", "./js/app.js", "./js/api.js", "./js/config.js", "./js/dashboard.js", "./js/inspection.js", "./js/records.js", "./js/settings.js", "./assets/logo.png", "./manifest.json"];
+const CACHE = "phc-supervisor-test-v1";
+const ASSETS = ["./", "./index.html", "./inspection.html", "./records.html", "./settings.html", "./supervisor.html", "./css/style.css", "./js/app.js", "./js/api.js", "./js/config.js", "./js/dashboard.js", "./js/inspection.js", "./js/records.js", "./js/settings.js", "./js/supervisor.js", "./assets/logo.png", "./manifest.json"];
 self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch",event=>{
