@@ -103,7 +103,7 @@ function saveInspection_(record, clientVersion) {
       deleteRowsByValue_(findingSheet, 2, oldId);
       inspectionSheet.getRange(existing, 1, 1, inspectionRow.length).setValues([inspectionRow]);
     } else {
-      inspectionSheet.appendRow(inspectionRow);
+      appendRows_(inspectionSheet, [inspectionRow]);
     }
 
     const checkRows = items.map(item => [
@@ -301,9 +301,10 @@ function setupSupervisorVerification() {
 
   const supervisorSheet = spreadsheet.getSheetByName(SHEETS.supervisors) || spreadsheet.insertSheet(SHEETS.supervisors);
   supervisorSheet.clear();
-  supervisorSheet.getRange(1,1,2,4).setValues([
+  supervisorSheet.getRange(1,1,3,4).setValues([
     ['EMAIL GOOGLE','NAMA RASMI','JAWATAN','STATUS'],
-    ['cherosli33@gmail.com','PPP Rosli','Penyelia PHC','AKTIF'],
+    ['cherosli33@gmail.com','PPP Rosli','Admin PHC','AKTIF'],
+    ['yusseriharon6835@gmail.com','Yusseri Haron','Penyelia PHC','AKTIF'],
   ]);
   supervisorSheet.getRange(1,1,1,4).setFontWeight('bold').setBackground('#071d36').setFontColor('#ffffff');
   supervisorSheet.setFrozenRows(1);
@@ -314,7 +315,7 @@ function setupSupervisorVerification() {
     logSheet.getRange(1,1,1,8).setFontWeight('bold').setBackground('#071d36').setFontColor('#ffffff');
     logSheet.setFrozenRows(1);
   }
-  return 'Pengesahan penyelia tersedia untuk PPP Rosli (cherosli33@gmail.com).';
+  return 'Akses tersedia untuk Admin PHC (cherosli33@gmail.com) dan Penyelia PHC (yusseriharon6835@gmail.com).';
 }
 
 function existingVerification_(sheet, checkKey) {
@@ -343,7 +344,7 @@ function authoriseSupervisor_(idToken) {
   const sheet = requiredSheet_(getSpreadsheet_(), SHEETS.supervisors);
   const rows = dataRows_(sheet, 4);
   const row = rows.find(item => String(item[0] || '').trim().toLowerCase() === email && String(item[3] || '').trim().toUpperCase() === 'AKTIF');
-  if (!row) throw new Error('Akses hanya untuk penyelia yang aktif.');
+  if (!row) throw new Error('Akses hanya untuk admin atau penyelia yang aktif.');
   return {email:email, name:safeText_(row[1],100), role:safeText_(row[2],100)};
 }
 
