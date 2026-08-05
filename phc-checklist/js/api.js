@@ -24,6 +24,21 @@ async function request(url, options={}){
 
 export function apiConfigured(){ return configured(); }
 
+export async function supervisorSession(idToken){
+    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    return request(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"supervisorSession",idToken})});
+}
+
+export async function fetchSupervisorRecords(idToken,from,to){
+    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    return request(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"supervisorRecords",idToken,from,to})});
+}
+
+export async function verifyInspections(idToken,recordIds){
+    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    return request(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"verifyInspections",idToken,recordIds})});
+}
+
 export async function saveRestockResolution(findingId, action, status="Telah diambil tindakan"){
     if(!configured()) throw new Error("Google Sheet belum disambungkan.");
     return request(APPS_SCRIPT_URL,{

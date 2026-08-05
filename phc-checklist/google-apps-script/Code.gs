@@ -1,4 +1,4 @@
-const APP_VERSION = '2.6.3';
+const APP_VERSION = '2.7.0-supervisor';
 
 
 const TIME_ZONE = 'Asia/Kuala_Lumpur';
@@ -7,6 +7,8 @@ const SHEETS = Object.freeze({
   checks: 'ITEM CHECK',
   findings: 'PENEMUAN',
   master: 'MASTER ITEM',
+  supervisors: 'SENARAI PENYELIA',
+  verificationLog: 'VERIFICATION LOG',
 });
 const MONTHS = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
 const VALID_BAGS = ['PHC 1','PHC 2'];
@@ -29,6 +31,9 @@ function doPost(e) {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (payload.action === 'saveInspection') return json_(saveInspection_(payload.record, payload.appVersion));
     if (payload.action === 'resolveFinding') return json_(resolveFinding_(payload.findingId, payload.resolution, payload.status));
+    if (payload.action === 'supervisorSession') return json_(supervisorSession_(payload.idToken));
+    if (payload.action === 'supervisorRecords') return json_({ok:true, supervisor:authoriseSupervisor_(payload.idToken), records:getRecords_(payload.from, payload.to)});
+    if (payload.action === 'verifyInspections') return json_(verifyInspections_(payload.idToken, payload.recordIds));
     return json_({ok:false, message:'Tindakan tidak dikenali.'});
   } catch (error) {
     return json_({ok:false, message:error.message || String(error)});
@@ -76,10 +81,12 @@ function saveInspection_(record, clientVersion) {
     const monthNumber = dateParts[1];
     const monthName = MONTHS[monthNumber - 1];
     const shortageCount = items.filter(item => item.qty < item.standard).length;
+    const priorVerification = existingVerification_(inspectionSheet, checked.checkKey);
     const inspectionRow = [
       checked.id, checked.checkKey, timestamp, date, monthName, monthNumber, date.getFullYear(),
       checked.bag, checked.shift, checked.ppp, items.length, shortageCount, checked.notes,
       'SYNCED', safeText_(clientVersion || APP_VERSION, 30),
+      priorVerification.verified, priorVerification.by, priorVerification.email, priorVerification.at,
     ];
 
     const priorActions = {};
@@ -96,7 +103,7 @@ function saveInspection_(record, clientVersion) {
       deleteRowsByValue_(findingSheet, 2, oldId);
       inspectionSheet.getRange(existing, 1, 1, inspectionRow.length).setValues([inspectionRow]);
     } else {
-      inspectionSheet.appendRow(inspectionRow);
+      appendRows_(inspectionSheet, [inspectionRow]);
     }
 
     const checkRows = items.map(item => [
@@ -150,7 +157,7 @@ function getRecords_(fromText, toText, latestInventoryOnly) {
   const fromKey = fromText ? safeText_(fromText, 10) : '2000-01-01';
   const toKey = toText ? safeText_(toText, 10) : '2100-12-31';
   parseIsoDate_(fromKey); parseIsoDate_(toKey);
-  const rows = dataRows_(inspectionSheet, 15).filter(row => row[0]);
+  const rows = dataRows_(inspectionSheet, 19).filter(row => row[0]);
   const selectedAll = rows.filter(row => {
     const dateKey = formatIsoDate_(row[3]); return dateKey >= fromKey && dateKey <= toKey;
   });
@@ -175,6 +182,8 @@ function getRecords_(fromText, toText, latestInventoryOnly) {
     time:Utilities.formatDate(normaliseDate_(row[2]), TIME_ZONE, 'HH:mm'),
     bag:String(row[7]), shift:String(row[8]), ppp:String(row[9]), notes:String(row[12] || ''),
     syncStatus:'SYNCED', appVersion:String(row[14] || ''), quantities:quantitiesById[String(row[0])] || {},
+    verified:Boolean(row[15]), verifiedBy:String(row[16] || ''), verifiedEmail:String(row[17] || ''),
+    verifiedAt:row[18] ? normaliseDateTime_(row[18]) : '',
   }));
 }
 
@@ -281,6 +290,90 @@ function setupSpreadsheetId(spreadsheetId) {
   return `Google Sheet disambungkan: ${file.getName()}`;
 }
 
+/** Jalankan sekali sebelum menguji fungsi pengesahan penyelia. */
+function setupSupervisorVerification() {
+  const spreadsheet = getSpreadsheet_();
+  const inspectionSheet = requiredSheet_(spreadsheet, SHEETS.inspections);
+  const headers = ['VERIFIED','VERIFIED BY','VERIFIED EMAIL','VERIFIED AT'];
+  inspectionSheet.getRange(1,16,1,headers.length).setValues([headers]);
+  inspectionSheet.getRange('P:P').setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build()).setHorizontalAlignment('center');
+  inspectionSheet.getRange('S:S').setNumberFormat('yyyy-mm-dd HH:mm:ss');
+
+  const supervisorSheet = spreadsheet.getSheetByName(SHEETS.supervisors) || spreadsheet.insertSheet(SHEETS.supervisors);
+  supervisorSheet.clear();
+  supervisorSheet.getRange(1,1,3,4).setValues([
+    ['EMAIL GOOGLE','NAMA RASMI','JAWATAN','STATUS'],
+    ['cherosli33@gmail.com','PPP Rosli','Admin PHC','AKTIF'],
+    ['yusseriharon6835@gmail.com','Yusseri Haron','Penyelia PHC','AKTIF'],
+  ]);
+  supervisorSheet.getRange(1,1,1,4).setFontWeight('bold').setBackground('#071d36').setFontColor('#ffffff');
+  supervisorSheet.setFrozenRows(1);
+
+  const logSheet = spreadsheet.getSheetByName(SHEETS.verificationLog) || spreadsheet.insertSheet(SHEETS.verificationLog);
+  if (!logSheet.getLastRow()) {
+    logSheet.getRange(1,1,1,8).setValues([['LOG ID','MASA','RECORD ID','TARIKH REKOD','BEG','SHIFT','NAMA PENYELIA','EMAIL PENYELIA']]);
+    logSheet.getRange(1,1,1,8).setFontWeight('bold').setBackground('#071d36').setFontColor('#ffffff');
+    logSheet.setFrozenRows(1);
+  }
+  return 'Akses tersedia untuk Admin PHC (cherosli33@gmail.com) dan Penyelia PHC (yusseriharon6835@gmail.com).';
+}
+
+function existingVerification_(sheet, checkKey) {
+  const row = findRowByValue_(sheet, 2, checkKey);
+  if (!row || sheet.getLastColumn() < 19) return {verified:false,by:'',email:'',at:''};
+  const values = sheet.getRange(row,16,1,4).getValues()[0];
+  return {verified:Boolean(values[0]),by:values[1] || '',email:values[2] || '',at:values[3] || ''};
+}
+
+function supervisorSession_(idToken) {
+  const supervisor = authoriseSupervisor_(idToken);
+  return {ok:true, supervisor:supervisor};
+}
+
+function authoriseSupervisor_(idToken) {
+  const token = safeText_(idToken, 5000);
+  if (!token) throw new Error('Log masuk Google diperlukan.');
+  const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), {muteHttpExceptions:true});
+  if (response.getResponseCode() !== 200) throw new Error('Sesi Google tidak sah atau telah tamat. Sila log masuk semula.');
+  const identity = JSON.parse(response.getContentText());
+  const clientId = PropertiesService.getScriptProperties().getProperty('GOOGLE_OAUTH_CLIENT_ID');
+  if (!clientId) throw new Error('GOOGLE_OAUTH_CLIENT_ID belum ditetapkan dalam Script Properties.');
+  if (String(identity.aud || '') !== clientId) throw new Error('Akaun Google bukan untuk aplikasi ini.');
+  if (String(identity.email_verified) !== 'true') throw new Error('E-mel Google belum disahkan.');
+  const email = String(identity.email || '').trim().toLowerCase();
+  const sheet = requiredSheet_(getSpreadsheet_(), SHEETS.supervisors);
+  const rows = dataRows_(sheet, 4);
+  const row = rows.find(item => String(item[0] || '').trim().toLowerCase() === email && String(item[3] || '').trim().toUpperCase() === 'AKTIF');
+  if (!row) throw new Error('Akses hanya untuk admin atau penyelia yang aktif.');
+  return {email:email, name:safeText_(row[1],100), role:safeText_(row[2],100)};
+}
+
+function verifyInspections_(idToken, recordIds) {
+  const supervisor = authoriseSupervisor_(idToken);
+  const ids = Array.from(new Set((Array.isArray(recordIds) ? recordIds : []).map(id => safeText_(id,80)).filter(Boolean)));
+  if (!ids.length) throw new Error('Pilih sekurang-kurangnya satu rekod.');
+  if (ids.length > 100) throw new Error('Maksimum 100 rekod bagi satu kelulusan.');
+  const spreadsheet = getSpreadsheet_();
+  const inspectionSheet = requiredSheet_(spreadsheet, SHEETS.inspections);
+  const logSheet = requiredSheet_(spreadsheet, SHEETS.verificationLog);
+  const lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    const now = new Date(); const logs = []; let verified = 0; let alreadyVerified = 0;
+    ids.forEach(id => {
+      const row = findRowByValue_(inspectionSheet, 1, id);
+      if (!row) return;
+      if (Boolean(inspectionSheet.getRange(row,16).getValue())) { alreadyVerified += 1; return; }
+      inspectionSheet.getRange(row,16,1,4).setValues([[true,supervisor.name,supervisor.email,now]]);
+      const values = inspectionSheet.getRange(row,1,1,10).getValues()[0];
+      logs.push(['VER-' + Utilities.getUuid(),now,id,values[3],values[7],values[8],supervisor.name,supervisor.email]);
+      verified += 1;
+    });
+    appendRows_(logSheet, logs);
+    SpreadsheetApp.flush();
+    return {ok:true, verified:verified, alreadyVerified:alreadyVerified, supervisor:supervisor, verifiedAt:now.toISOString()};
+  } finally { lock.releaseLock(); }
+}
+
 /** Jalankan sekali selepas memasang versi 2.4.0. */
 function migrateProductionData() {
   const spreadsheet = getSpreadsheet_();
@@ -288,7 +381,7 @@ function migrateProductionData() {
   const inspectionSheet = requiredSheet_(spreadsheet, SHEETS.inspections);
   const checkSheet = requiredSheet_(spreadsheet, SHEETS.checks);
   const findingSheet = requiredSheet_(spreadsheet, SHEETS.findings);
-  const inspections = dataRows_(inspectionSheet, 15).filter(row => row[0] && row[1]);
+  const inspections = dataRows_(inspectionSheet, 19).filter(row => row[0] && row[1]);
 
   const latestByKey = {};
   inspections.forEach(row => {
@@ -347,7 +440,7 @@ function migrateProductionData() {
     }
   });
 
-  rewriteData_(inspectionSheet, 15, keptInspections);
+  rewriteData_(inspectionSheet, 19, keptInspections);
   rewriteData_(checkSheet, 18, keptChecks);
   rewriteData_(findingSheet, 14, rebuiltFindings);
   /* Pemformatan Sheet sudah tersedia; elak kerja berulang semasa simpan. */
@@ -408,5 +501,3 @@ function normaliseDate_(value) { return value instanceof Date ? value : new Date
 function normaliseDateTime_(value) { return normaliseDate_(value).toISOString(); }
 function formatIsoDate_(value) { return Utilities.formatDate(normaliseDate_(value), TIME_ZONE, 'yyyy-MM-dd'); }
 function json_(payload) { return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON); } function getDashboard_(fromText,toText) { return {ok:true,version:APP_VERSION,records:getRecords_(fromText,toText,true),findings:getFindings_(fromText,toText,true)}; } function deleteRowsByValue_(sheet,column,value) { const lastRow=sheet.getLastRow(); if(lastRow<2)return; const rows=sheet.getRange(2,column,lastRow-1,1).getDisplayValues().map((row,index)=>String(row[0])===String(value)?index+2:0).filter(Boolean); if(!rows.length)return; const groups=[]; rows.forEach(row=>{const current=groups[groups.length-1];if(current&&row===current.start+current.count)current.count+=1;else groups.push({start:row,count:1});}); groups.reverse().forEach(group=>sheet.deleteRows(group.start,group.count)); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); } function getFindings_(fromText, toText, includeAll) { const spreadsheet=getSpreadsheet_(); const sheet=requiredSheet_(spreadsheet,SHEETS.findings); const fromKey=fromText?safeText_(fromText,10):'2000-01-01'; const toKey=toText?safeText_(toText,10):'2100-12-31'; parseIsoDate_(fromKey); parseIsoDate_(toKey); return dataRows_(sheet,14).filter(row=>{ const dateKey=formatIsoDate_(row[2]); return row[0]&&(includeAll||String(row[7])==='Catatan pengguna')&&dateKey>=fromKey&&dateKey<=toKey; }).map(row=>{ const isNote=String(row[7])==='Catatan pengguna'; return {type:isNote?'note':'shortage',id:String(row[0]),inspectionId:String(row[1]),date:formatIsoDate_(row[2]),bagShift:String(row[6]),item:isNote?'':String(row[7]||''),qty:isNote?null:Number(row[8]),standard:isNote?null:Number(row[9]),note:isNote?String(row[12]||''):'',action:String(row[10]||''),actionAt:row[11]?normaliseDateTime_(row[11]):'',status:String(row[13]||'Belum diambil tindakan')}; }); }
-
-

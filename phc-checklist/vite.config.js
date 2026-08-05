@@ -18,7 +18,8 @@ export default defineConfig({
         dashboard: "index.html",
         inspection: "inspection.html",
         records: "records.html",
-        settings: "settings.html"
+        settings: "settings.html",
+        supervisor: "supervisor.html"
       }
     }
   }
