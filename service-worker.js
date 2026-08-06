@@ -1,4 +1,4 @@
-const CACHE = "amo-etd-lepeh-v27-asthma-patient-lookup";
+const CACHE = "amo-etd-lepeh-v28-procedure-report";
 const ASSETS = [
   "./",
   "./index.html",

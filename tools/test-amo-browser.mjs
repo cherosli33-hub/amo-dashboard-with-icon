@@ -50,6 +50,18 @@ await page.route("**/exec*", async route => {
   }
   if (request.method() === "GET" && request.url().includes("action=data")) {
     await new Promise(resolve => setTimeout(resolve, 2200));
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: JSON.stringify([
+        ["Timestamp", "Date", "Time", "Shift", "Zone", "IDPesakit", "Procedure", "DurationMinutes"],
+        ["test-report", date, "09:15", "morning", "yellow_zone", "REPORT-001", "Dressing", 15]
+      ])
+    });
+    return;
   }
   await route.continue();
 });
@@ -57,7 +69,7 @@ await page.route("**/exec*", async route => {
 const startedAt = Date.now();
 await page.goto("http://127.0.0.1:4173/amo.html", { waitUntil: "domcontentloaded" });
 await page.waitForFunction(() => document.querySelector("#loading-screen")?.classList.contains("hidden"), null, { timeout: 20000 });
-await page.getByRole("heading", { name: /Log Prosedur Assistan Medical Officer/ }).waitFor();
+await page.getByRole("heading", { name: /Assistant Medical Officer.*Procedure Log/ }).waitFor();
 const firstPaintMs = Date.now() - startedAt;
 const cachedCount = (await page.locator(".ring-center .num").textContent())?.trim();
 if (cachedCount !== "1") throw new Error(`Cached dashboard did not render first; count was ${cachedCount}.`);
@@ -73,6 +85,20 @@ await page.waitForFunction(() => {
   const cache = localStorage.getItem("amo-procedure-cases-v1") || "";
   return !cache.includes("cached-first-paint");
 }, null, { timeout: 20000 });
+
+await page.getByRole("button", { name: "Laporan", exact: true }).click();
+await page.getByRole("heading", { name: "Laporan Prosedur", exact: true }).waitFor();
+await page.getByRole("button", { name: "Jana Laporan A4", exact: true }).click();
+await page.getByRole("button", { name: "Cetak / Simpan PDF", exact: true }).waitFor();
+const reportSummary = await page.locator(".report-summary").innerText();
+if (!reportSummary.includes("1\nJUMLAH PESAKIT") || !reportSummary.includes("15\nJUMLAH MINIT")) {
+  throw new Error(`Unexpected report summary: ${reportSummary}`);
+}
+if (await page.locator(".report-table tbody tr").count() !== 1) {
+  throw new Error("Generated procedure report did not contain the expected row.");
+}
+await page.screenshot({ path: "artifacts/procedure-report-mobile.png", fullPage: true });
+await page.getByRole("button", { name: "Dashboard", exact: true }).click();
 
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 if (overflow > 1) throw new Error(`Mobile layout overflows horizontally by ${overflow}px.`);
@@ -99,6 +125,7 @@ await browser.close();
 console.log("PASS: shared production data endpoint can be read from the GitHub-style frontend.");
 console.log(`PASS: cached dashboard rendered first in ${firstPaintMs}ms, then refreshed from Sheet.`);
 console.log("PASS: mobile + button remains visible without scrolling.");
+console.log("PASS: weekly A4 procedure report loads full data and renders summary/table output.");
 console.log("PASS: shift, zone, patient ID, procedure and save flow work on a mobile viewport.");
 console.log("PASS: production save payload is correct; the test POST was intercepted before reaching Sheet.");
 console.log("PASS: mobile layout has no horizontal overflow.");
