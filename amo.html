@@ -372,8 +372,16 @@ async function fetchRowsWithRetry(maxAttempts = 3){
 let state = {
   cases: [],
   dashboardDate: todayKey(),
-  dashboardTab: "summary", // summary | records
+  dashboardTab: "summary", // summary | records | report
   recordShiftFilter: "all", // all | morning | evening | night
+  reportPeriod: "weekly", // weekly | monthly | yearly
+  reportMonth: new Date().getMonth() + 1,
+  reportWeek: 1,
+  reportYear: new Date().getFullYear(),
+  reportShift: "all",
+  reportCases: null,
+  reportLoading: false,
+  reportError: "",
   view: "dashboard", // dashboard | newcase
   step: 1,
   selectedShift: null,
@@ -855,7 +863,7 @@ function writeCasesCache(cases){
   catch(_){ /* Cache is optional; Sheet remains the source of truth. */ }
 }
 
-function casesFromSheetRows(rows){
+function casesFromSheetRows(rows, limitToTrend = true){
   const headers = (rows[0] || []).map(h => String(h || "").trim());
   const findIndex = (name, fallback) => {
     const idx = headers.indexOf(name);
@@ -877,7 +885,7 @@ function casesFromSheetRows(rows){
   rows.slice(1).forEach((row, idx) => {
     const ts = row[col.ts];
     const dateKey = normalizeDateKey(row[col.date]);
-    if(!trendDateKeys.has(dateKey)) return;
+    if(limitToTrend && !trendDateKeys.has(dateKey)) return;
     const time = row[col.time];
     const shift = row[col.shift];
     const zone = col.zone >= 0 ? String(row[col.zone] || "").trim() : "";
@@ -893,7 +901,7 @@ function casesFromSheetRows(rows){
 
 
 function setDashboardTab(tab){
-  state.dashboardTab = tab === "records" ? "records" : "summary";
+  state.dashboardTab = ["records","report"].includes(tab) ? tab : "summary";
   renderDashboard();
 }
 
@@ -911,7 +919,117 @@ function dashboardTabsHtml(activeTab){
   return `<nav class="dashboard-tabs" aria-label="Paparan Prosedur">
     <button type="button" class="dashboard-tab ${activeTab === "summary" ? "active" : ""}" onclick="setDashboardTab('summary')">Dashboard</button>
     <button type="button" class="dashboard-tab ${activeTab === "records" ? "active" : ""}" onclick="setDashboardTab('records')">Rekod Hari Ini</button>
+    <button type="button" class="dashboard-tab ${activeTab === "report" ? "active" : ""}" onclick="setDashboardTab('report')">Laporan</button>
   </nav>`;
+}
+
+const REPORT_MONTHS = ["Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember"];
+
+function updateReportFilter(name, value){
+  if(name === "period") state.reportPeriod = ["weekly","monthly","yearly"].includes(value) ? value : "weekly";
+  if(name === "month") state.reportMonth = Math.min(12, Math.max(1, Number(value) || 1));
+  if(name === "week") state.reportWeek = Math.min(5, Math.max(1, Number(value) || 1));
+  if(name === "year") state.reportYear = Math.min(2100, Math.max(2020, Number(value) || new Date().getFullYear()));
+  if(name === "shift") state.reportShift = ["morning","evening","night"].includes(value) ? value : "all";
+  state.reportCases = null;
+  state.reportError = "";
+  renderDashboard();
+}
+
+function reportDateRange(){
+  const year = state.reportYear;
+  if(state.reportPeriod === "yearly"){
+    return { start: new Date(year,0,1), end: new Date(year,11,31), label: `Tahun ${year}` };
+  }
+  const monthIndex = state.reportMonth - 1;
+  const monthName = REPORT_MONTHS[monthIndex];
+  if(state.reportPeriod === "monthly"){
+    return { start: new Date(year,monthIndex,1), end: new Date(year,monthIndex + 1,0), label: `${monthName} ${year}` };
+  }
+  const startDay = ((state.reportWeek - 1) * 7) + 1;
+  const lastDay = new Date(year,monthIndex + 1,0).getDate();
+  const endDay = state.reportWeek === 5 ? lastDay : Math.min(startDay + 6, lastDay);
+  const safeStartDay = Math.min(startDay, lastDay);
+  return {
+    start: new Date(year,monthIndex,safeStartDay),
+    end: new Date(year,monthIndex,endDay),
+    label: `Minggu ${state.reportWeek}, ${monthName} ${year} (${safeStartDay}–${endDay} ${monthName})`,
+  };
+}
+
+function dateFromKey(key){
+  const match = String(key || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? new Date(Number(match[1]),Number(match[2]) - 1,Number(match[3])) : null;
+}
+
+function filterReportCases(cases){
+  const range = reportDateRange();
+  const start = calendarDateKey(range.start);
+  const end = calendarDateKey(range.end);
+  return cases.filter(item => item.date >= start && item.date <= end && (state.reportShift === "all" || item.shift === state.reportShift));
+}
+
+async function generateProcedureReport(){
+  state.reportLoading = true;
+  state.reportError = "";
+  renderDashboard();
+  try{
+    const rows = await fetchRowsWithRetry();
+    state.reportCases = filterReportCases(casesFromSheetRows(rows, false));
+  }catch(err){
+    console.error("Report load failed:", err);
+    state.reportCases = null;
+    state.reportError = "Data penuh tidak dapat dimuatkan. Semak sambungan dan cuba lagi.";
+  }
+  state.reportLoading = false;
+  renderDashboard();
+}
+
+function formatReportDate(key){
+  const date = dateFromKey(key);
+  return date ? date.toLocaleDateString("ms-MY", { day:"2-digit", month:"2-digit", year:"numeric" }) : key;
+}
+
+function reportPreviewHtml(cases){
+  const range = reportDateRange();
+  const shiftLabel = state.reportShift === "all" ? "Semua syif" : `Syif ${shiftMeta(state.reportShift)?.label || state.reportShift}`;
+  const procedureTotal = cases.reduce((sum,item) => sum + item.procedures.length, 0);
+  const minutesTotal = cases.reduce((sum,item) => sum + item.procedures.reduce((subtotal,proc) => subtotal + (Number(proc.minutes) || 0), 0), 0);
+  const rows = cases.flatMap(item => item.procedures.map(proc => {
+    const shift = shiftMeta(item.shift);
+    const zone = zoneMeta(item.zone);
+    return `<tr><td>${esc(formatReportDate(item.date))}</td><td>${esc(String(item.time || "—"))}</td><td>${esc(shift?.label || item.shift || "—")}</td><td>${esc(zone?.label || "—")}</td><td>${esc(String(item.registrationNumber || item.patientId || "—"))}</td><td>${esc(proc.name || "—")}</td><td class="report-number">${Number(proc.minutes) || 0}</td></tr>`;
+  })).join("");
+  return `<section class="report-preview" id="procedure-report-print">
+    <header class="report-print-header"><div><p>UNIT KECEMASAN & TRAUMA · HOSPITAL KUALA LIPIS</p><h2>Laporan Prosedur A.M.O</h2><span>${esc(range.label)} · ${esc(shiftLabel)}</span></div><img src="./prosedur-icon.png?v=2.6.0" alt=""></header>
+    <div class="report-summary"><div><strong>${cases.length}</strong><span>Jumlah pesakit</span></div><div><strong>${procedureTotal}</strong><span>Jumlah prosedur</span></div><div><strong>${minutesTotal}</strong><span>Jumlah minit</span></div></div>
+    ${rows ? `<div class="report-table-wrap"><table class="report-table"><thead><tr><th>Tarikh</th><th>Masa</th><th>Syif</th><th>Zone</th><th>ID Pesakit</th><th>Prosedur</th><th>Minit</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="report-empty">Tiada rekod untuk tempoh dan syif yang dipilih.</div>`}
+    <footer class="report-print-footer">Dijana pada ${esc(new Date().toLocaleString("ms-MY"))}</footer>
+  </section>`;
+}
+
+function procedureReportHtml(){
+  const yearNow = new Date().getFullYear();
+  const years = Array.from({length:7}, (_,idx) => yearNow - 5 + idx);
+  return `<div class="header"><div><div class="date">LAPORAN A4</div><h1>Laporan Prosedur</h1></div><div class="icon"><img src="./prosedur-icon.png?v=2.6.0" alt="Logo Log Prosedur A.M.O"></div></div>
+    ${dashboardTabsHtml("report")}
+    <section class="report-filter-card">
+      <div class="report-period-tabs" role="group" aria-label="Jenis tempoh laporan">
+        <button type="button" class="${state.reportPeriod === "weekly" ? "active" : ""}" onclick="updateReportFilter('period','weekly')">Mingguan</button>
+        <button type="button" class="${state.reportPeriod === "monthly" ? "active" : ""}" onclick="updateReportFilter('period','monthly')">Bulanan</button>
+        <button type="button" class="${state.reportPeriod === "yearly" ? "active" : ""}" onclick="updateReportFilter('period','yearly')">Tahunan</button>
+      </div>
+      <div class="report-filter-grid">
+        ${state.reportPeriod !== "yearly" ? `<label>Bulan<select onchange="updateReportFilter('month',this.value)">${REPORT_MONTHS.map((month,idx) => `<option value="${idx + 1}" ${state.reportMonth === idx + 1 ? "selected" : ""}>${month}</option>`).join("")}</select></label>` : ""}
+        ${state.reportPeriod === "weekly" ? `<label>Minggu<select onchange="updateReportFilter('week',this.value)">${[1,2,3,4,5].map(week => `<option value="${week}" ${state.reportWeek === week ? "selected" : ""}>Minggu ${week}</option>`).join("")}</select></label>` : ""}
+        <label>Tahun<select onchange="updateReportFilter('year',this.value)">${years.map(year => `<option value="${year}" ${state.reportYear === year ? "selected" : ""}>${year}</option>`).join("")}</select></label>
+        <label>Syif<select onchange="updateReportFilter('shift',this.value)"><option value="all" ${state.reportShift === "all" ? "selected" : ""}>Semua syif</option>${SHIFTS.map(shift => `<option value="${shift.id}" ${state.reportShift === shift.id ? "selected" : ""}>${shift.label}</option>`).join("")}</select></label>
+      </div>
+      <button type="button" class="report-generate" onclick="generateProcedureReport()" ${state.reportLoading ? "disabled" : ""}>${state.reportLoading ? "Memuatkan data penuh…" : "Jana Laporan A4"}</button>
+      <p class="report-data-note">Data penuh dari Google Sheet hanya dimuatkan selepas butang ini ditekan.</p>
+      ${state.reportError ? `<div class="sync-warn report-error">${esc(state.reportError)}</div>` : ""}
+    </section>
+    ${Array.isArray(state.reportCases) ? `<div class="report-actions"><span>${esc(reportDateRange().label)}</span><button type="button" onclick="window.print()">Cetak / Simpan PDF</button></div>${reportPreviewHtml(state.reportCases)}` : `<div class="report-placeholder">Pilih tempoh dan syif, kemudian tekan <strong>Jana Laporan A4</strong>.</div>`}`;
 }
 
 function dailyRecordsHtml(todayCases, now){
@@ -955,7 +1073,7 @@ function dailyRecordsHtml(todayCases, now){
 (function injectDailyRecordsStyles(){
   const style = document.createElement("style");
   style.textContent = `
-    .dashboard-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;margin:-8px 0 22px;background:var(--chip);border:1px solid var(--border);border-radius:12px}
+    .dashboard-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:5px;margin:-8px 0 22px;background:var(--chip);border:1px solid var(--border);border-radius:12px}
     .dashboard-tab{padding:10px 8px;border-radius:8px;color:var(--muted2);font-size:14px;font-weight:600}
     .dashboard-tab.active{background:var(--panel);color:var(--accent);box-shadow:0 2px 8px rgba(28,36,32,.08)}
     .record-shift-filters{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:-10px 0 16px}
@@ -977,7 +1095,54 @@ function dailyRecordsHtml(todayCases, now){
     .daily-procedure-chip{padding:5px 8px;border-radius:7px;background:#edf9f3;color:#245c43;font-size:12px}
     .daily-procedure-chip small{color:#5d7b69}
     .daily-shift-empty{padding:16px;border:1px dashed var(--border);border-radius:12px;color:var(--faint);font-size:13px;text-align:center}
+    .report-filter-card{padding:16px;margin-bottom:18px;border:1px solid var(--border);border-radius:16px;background:var(--panel)}
+    .report-period-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:15px;padding:4px;border-radius:10px;background:var(--chip)}
+    .report-period-tabs button{padding:9px 5px;border-radius:7px;color:var(--muted2);font-size:13px;font-weight:600}
+    .report-period-tabs button.active{background:var(--accent);color:#fff}
+    .report-filter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .report-filter-grid label{display:flex;flex-direction:column;gap:6px;color:var(--muted2);font-size:12px;font-weight:600}
+    .report-filter-grid select{width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text);font:inherit}
+    .report-generate{width:100%;padding:13px;border-radius:11px;background:var(--accent);color:#fff;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700}
+    .report-generate:disabled{opacity:.55}
+    .report-data-note{margin-top:9px;color:var(--muted);font-size:11px;text-align:center}
+    .report-error{margin:12px 0 0}
+    .report-placeholder{padding:28px 18px;border:1px dashed var(--border);border-radius:14px;background:var(--panel);color:var(--muted);font-size:14px;text-align:center}
+    .report-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;color:var(--muted2);font-size:12px}
+    .report-actions button{padding:9px 12px;border-radius:9px;background:#1c2420;color:#fff;font-weight:600}
+    .report-preview{padding:22px;border:1px solid var(--border);border-radius:14px;background:#fff;box-shadow:0 10px 30px rgba(28,36,32,.06)}
+    .report-print-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:14px;border-bottom:2px solid #1c9665}
+    .report-print-header p{color:#557064;font-size:9px;font-weight:700;letter-spacing:.08em}
+    .report-print-header h2{margin:3px 0;font-family:'Space Grotesk',sans-serif;font-size:20px}
+    .report-print-header span{color:#5c6560;font-size:11px}
+    .report-print-header img{width:48px;height:48px;border-radius:10px;object-fit:contain}
+    .report-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0}
+    .report-summary div{padding:11px;border-radius:9px;background:#edf9f3;text-align:center}
+    .report-summary strong{display:block;font-family:'IBM Plex Mono',monospace;font-size:20px;color:#176b49}
+    .report-summary span{display:block;margin-top:2px;color:#557064;font-size:9px;text-transform:uppercase}
+    .report-table-wrap{overflow-x:auto}
+    .report-table{width:100%;border-collapse:collapse;font-size:10px}
+    .report-table th{padding:8px 7px;background:#1c2420;color:#fff;text-align:left;white-space:nowrap}
+    .report-table td{padding:7px;border-bottom:1px solid #e4e0d5;vertical-align:top}
+    .report-table tbody tr:nth-child(even){background:#f8faf8}
+    .report-table .report-number{text-align:right;font-family:'IBM Plex Mono',monospace}
+    .report-empty{padding:30px;border:1px dashed #d8d6cf;color:#6b7268;text-align:center}
+    .report-print-footer{margin-top:12px;color:#8a8478;font-size:8px;text-align:right}
     @media(max-width:520px){.dashboard-tabs{margin-top:-4px;margin-bottom:16px}.daily-shift-heading{align-items:flex-start}.daily-shift-heading>div{flex-wrap:wrap}.daily-shift-heading small{width:100%;padding-left:16px}}
+    @media(max-width:520px){.dashboard-tab{font-size:12px}.report-filter-grid{grid-template-columns:1fr 1fr}.report-preview{padding:12px}.report-actions{align-items:flex-start;flex-direction:column}.report-table{min-width:650px}}
+    @media print{
+      @page{size:A4 landscape;margin:10mm}
+      body{padding:0!important;background:#fff!important;background-image:none!important}
+      body>*{display:none!important}
+      #dashboard-view{display:block!important;max-width:none!important;padding:0!important;margin:0!important}
+      #dashboard-view>*{display:none!important}
+      #dashboard-view .report-preview{display:block!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important}
+      .report-preview *{visibility:visible}
+      .report-table-wrap{overflow:visible!important}
+      .report-table{font-size:8pt}
+      .report-table thead{display:table-header-group}
+      .report-table tr{break-inside:avoid}
+      .report-print-footer{position:fixed;right:0;bottom:0}
+    }
   `;
   document.head.appendChild(style);
 })();
@@ -1002,6 +1167,11 @@ renderDashboard = function(){
   const today = state.dashboardDate;
   const now = new Date();
   const todayCases = state.cases.filter(c => c.date === today);
+  document.getElementById("fab").classList.toggle("hidden", state.dashboardTab === "report");
+  if(state.dashboardTab === "report"){
+    document.getElementById("dashboard-view").innerHTML = procedureReportHtml();
+    return;
+  }
   if(state.dashboardTab === "records"){
     document.getElementById("dashboard-view").innerHTML = dailyRecordsHtml(todayCases, now);
     return;
