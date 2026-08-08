@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Import Data Lama · AMO Dashboard v2</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar"><a href="./">← Kembali</a><div><small>AMO Dashboard v2</small><h1>Import Data Lama</h1></div></header>
+  <main class="shell">
+    <section class="panel">
+      <h2 id="title">Menyemak akses admin…</h2>
+      <p id="status">Halaman ini hanya boleh digunakan oleh admin yang diluluskan.</p>
+      <button id="importBtn" type="button" hidden>Import ke Firebase</button>
+      <pre id="log" aria-live="polite"></pre>
+    </section>
+  </main>
+  <script type="module" src="migrate.js"></script>
+</body>
+</html>
