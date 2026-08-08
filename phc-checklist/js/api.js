@@ -25,22 +25,22 @@ async function request(url, options={}){
 export function apiConfigured(){ return configured(); }
 
 export async function supervisorSession(idToken){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     return request(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"supervisorSession",idToken})});
 }
 
 export async function fetchSupervisorRecords(idToken,from,to){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     return request(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"supervisorRecords",idToken,from,to})});
 }
 
 export async function verifyInspections(idToken,recordIds){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     return request(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"verifyInspections",idToken,recordIds})});
 }
 
 export async function saveRestockResolution(findingId, action, status="Telah diambil tindakan"){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     return request(APPS_SCRIPT_URL,{
           method:"POST",
           headers:{"Content-Type":"text/plain;charset=utf-8"},
@@ -49,7 +49,7 @@ export async function saveRestockResolution(findingId, action, status="Telah dia
 }
 
 export async function fetchRecords(from,to){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     const url=new URL(APPS_SCRIPT_URL); url.searchParams.set("action","records");
     if(from) url.searchParams.set("from",from); if(to) url.searchParams.set("to",to);
     url.searchParams.set("_ts",String(Date.now()));
@@ -58,7 +58,7 @@ export async function fetchRecords(from,to){
 }
 
 export async function fetchFindings(from,to){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     const url=new URL(APPS_SCRIPT_URL); url.searchParams.set("action","findings");
     if(from) url.searchParams.set("from",from); if(to) url.searchParams.set("to",to);
     url.searchParams.set("all","1"); url.searchParams.set("_ts",String(Date.now()));
@@ -67,7 +67,7 @@ export async function fetchFindings(from,to){
 }
 
 export async function fetchDashboard(from,to){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     const url=new URL(APPS_SCRIPT_URL); url.searchParams.set("action","dashboard");
     if(from) url.searchParams.set("from",from); if(to) url.searchParams.set("to",to);
     url.searchParams.set("_ts",String(Date.now()));
@@ -79,7 +79,7 @@ export async function fetchDashboard(from,to){
 }
 
 export async function fetchLatestInventory(){
-    if(!configured()) throw new Error("Google Sheet belum disambungkan.");
+    if(!configured()) throw new Error("Firebase belum disambungkan.");
     const url=new URL(APPS_SCRIPT_URL); url.searchParams.set("action","latestInventory");
     url.searchParams.set("_ts",String(Date.now()));
     const data=await request(url.toString(),{cache:"no-store"});
@@ -104,7 +104,7 @@ export async function saveInspection(record){
           saveFindings(cached);
     }
     if(configured() && navigator.onLine) syncPendingInspections().catch(()=>{});
-    return {record:prepared,synced:false,message:"Rekod disimpan. Sync Google Sheet berjalan di belakang."};
+    return {record:prepared,synced:false,message:"Rekod disimpan. Sync Firebase berjalan di belakang."};
 }
 
 let restockSyncPromise=null;

@@ -16,11 +16,12 @@ import { db } from "./core.js";
 
 export const COLLECTIONS = Object.freeze({
   users: "users",
-  girn: "girn_records",
+  girn: "girn_inspections",
   girnFindings: "girn_findings",
-  phc: "phc_records",
-  asthma: "asthma_records",
-  procedure: "procedure_records"
+  phc: "phc_inspections",
+  phcFindings: "phc_findings",
+  asthma: "asthma_assessments",
+  procedure: "procedure_cases"
 });
 
 export function serverNow() {

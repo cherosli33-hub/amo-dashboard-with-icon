@@ -49,7 +49,7 @@ function currentLowItems(){
         findingId:finding.id,findingStatus:finding.status,
         key:`${finding.inspectionId}|${finding.item}`};
     })
-    // hanya sembunyi jika tindakan BENAR-BENAR sudah sampai ke Sheet
+    // hanya sembunyi jika tindakan BENAR-BENAR sudah sampai ke Firebase
     .filter(item=>actions[item.key]?.syncStatus!=="SYNCED");
 }
 
@@ -98,7 +98,7 @@ function refresh(){
 
 async function runRefresh(){
   refreshDateWindow();
-  if(!apiConfigured()){ connectionMessage="Google Sheet belum disambungkan."; render(); return; }
+  if(!apiConfigured()){ connectionMessage="Firebase belum disambungkan."; render(); return; }
   const inspectionSync=syncPendingInspections().catch(()=>({synced:0})); syncPendingRestockActions().catch(()=>{});
   const from=isoDate(weekDays[0]); const to=isoDate(weekDays[6]);
   const dashboardResult=await fetchDashboard(from,to).then(value=>({ok:true,value})).catch(error=>({ok:false,error}));
@@ -144,11 +144,11 @@ restockModal.addEventListener("click",async event=>{
     const stampOne=new Date().toISOString();
     const latestOne=loadLatestInventory();
     Object.values(latestOne).forEach(record=>{ const copy=structuredClone(record); let ubah=false; Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(item=>{ if(`${record.id}|${item.name}`===key && item.qty<item.standard){ item.qty=item.standard; ubah=true; } })); if(ubah){ copy.savedAt=stampOne; saveLatestInventory(copy); } });
-    restockModal.hidden=true; connectionMessage="Item ditanda. Menghantar tindakan ke Google Sheet..."; render();
+    restockModal.hidden=true; connectionMessage="Item ditanda. Menghantar tindakan ke Firebase..."; render();
     const resOne=await syncPendingRestockActions().catch(()=>({synced:0,pending:1}));
     connectionMessage=resOne.pending
       ? `Item dikemas kini pada telefon. Tindakan BELUM masuk Sheet${resOne.lastError?` (${resOne.lastError})`:""}. Cuba semula automatik.`
-      : `Item direkodkan dalam Google Sheet sebagai Telah diambil tindakan.`;
+      : `Item direkodkan dalam Firebase sebagai Telah diambil tindakan.`;
     render();
     return;
   }
@@ -159,11 +159,11 @@ restockModal.addEventListener("click",async event=>{
   const activeItems=currentLowItems().map(item=>({key:item.key,findingId:item.findingId}));
   activeItems.forEach(({key,findingId})=>saveRestockAction(key,"Semua stok telah ditambah",{findingId,syncStatus:"PENDING"}));
   Object.values(latest).forEach(record=>{ const copy=structuredClone(record); Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(item=>{ if(item.qty<item.standard) item.qty=item.standard; })); copy.savedAt=stamp; saveLatestInventory(copy); });
-  restockModal.hidden=true; connectionMessage="Stok dikemas kini. Menghantar tindakan ke Google Sheet..."; render();
+  restockModal.hidden=true; connectionMessage="Stok dikemas kini. Menghantar tindakan ke Firebase..."; render();
   const result=await syncPendingRestockActions().catch(()=>({synced:0,pending:activeItems.length}));
   connectionMessage=result.pending
     ? `Stok dikemas kini pada telefon. ${result.pending} tindakan BELUM masuk Sheet${result.lastError?` (${result.lastError})`:""}. Cuba semula automatik.`
-    : `${result.synced} tindakan direkodkan dalam Google Sheet sebagai Telah diambil tindakan.`;
+    : `${result.synced} tindakan direkodkan dalam Firebase sebagai Telah diambil tindakan.`;
   render();
 });
 function resumeRefresh(){ refreshDateWindow(); render(); refresh(); }

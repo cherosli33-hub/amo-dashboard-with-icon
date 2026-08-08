@@ -1,4 +1,4 @@
-const CACHE = "amo-etd-lepeh-v28-procedure-report";
+const CACHE = "amo-dashboard-v2-firebase-1";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,20 @@ const ASSETS = [
   "./config.js?v=7",
   "./pefr.mjs",
   "./asthma.mjs?v=14",
+  "./shared/firebase/bootstrap.js?v=2",
+  "./shared/firebase/legacy-adapter.js",
+  "./shared/firebase/core.js",
+  "./shared/firebase/auth.js",
+  "./shared/firebase/database.js",
+  "./shared/firebase/users.js",
+  "./shared/firebase/portal-auth.js?v=2",
+  "./data-dashboard/",
+  "./data-dashboard/app.js?v=2",
+  "./data-dashboard/styles.css?v=2",
+  "./data-dashboard/modules/procedure.js",
+  "./data-dashboard/modules/asthma.js",
+  "./data-dashboard/modules/phc.js",
+  "./data-dashboard/modules/girn.js",
   "./manifest.json?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",

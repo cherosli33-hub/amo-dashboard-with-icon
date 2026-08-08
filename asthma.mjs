@@ -338,15 +338,18 @@ function makeRecord() {
 }
 
 function sheetRequest(action, { method = "GET", record = null, params = {} } = {}) {
+  if (window.AMOFirebaseRequest) {
+    return window.AMOFirebaseRequest({ module: "asthma", action, method, record, params });
+  }
   return new Promise((resolve, reject) => {
-    if (!endpoint()) { reject(new Error("Google Sheet belum disambungkan.")); return; }
+    if (!endpoint()) { reject(new Error("Firebase belum disambungkan.")); return; }
     const requestId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const iframe = document.createElement("iframe");
     iframe.hidden = true;
     iframe.name = `asthma-sheet-${requestId}`;
     iframe.setAttribute("aria-hidden", "true");
     let formElement = null;
-    const timeout = window.setTimeout(() => cleanup(new Error("Masa sambungan Google Sheet tamat.")), requestTimeout());
+    const timeout = window.setTimeout(() => cleanup(new Error("Masa sambungan Firebase tamat.")), requestTimeout());
 
     function cleanup(error, data) {
       window.clearTimeout(timeout);
@@ -367,7 +370,7 @@ function sheetRequest(action, { method = "GET", record = null, params = {} } = {
     }
 
     window.addEventListener("message", onMessage);
-    iframe.addEventListener("error", () => cleanup(new Error("Gagal menghubungi Google Sheet.")), { once: true });
+    iframe.addEventListener("error", () => cleanup(new Error("Gagal menghubungi Firebase.")), { once: true });
     document.body.append(iframe);
 
     const url = new URL(endpoint());
@@ -397,7 +400,7 @@ function sheetRequest(action, { method = "GET", record = null, params = {} } = {
 
 async function postRecord(record) {
   const response = await sheetRequest("saveAsthmaAssessment", { method: "POST", record });
-  if (!response?.ok) throw new Error(response?.error || "Rekod gagal disimpan ke Google Sheet.");
+  if (!response?.ok) throw new Error(response?.error || "Rekod gagal disimpan ke Firebase.");
   return response;
 }
 
@@ -409,7 +412,7 @@ async function loadSharedRecords(showMessage = false) {
     syncNotice.hidden = true;
     renderRecords();
     renderStats();
-    if (showMessage) showToast("Rekod Google Sheet telah dimuat semula.");
+    if (showMessage) showToast("Rekod Firebase telah dimuat semula.");
   } catch (error) {
     sharedRecords = getPending();
     syncNotice.hidden = false;
@@ -441,7 +444,7 @@ async function syncPendingInBackground({ notify = true } = {}) {
   const synced = await retryPending();
   if (!synced) return;
   await loadSharedRecords();
-  if (notify) showToast(synced === 1 ? "Rekod berjaya disegerakkan ke Google Sheet." : `${synced} rekod berjaya disegerakkan ke Google Sheet.`);
+  if (notify) showToast(synced === 1 ? "Rekod berjaya disegerakkan ke Firebase." : `${synced} rekod berjaya disegerakkan ke Firebase.`);
 }
 
 function showToast(message) {
@@ -657,10 +660,10 @@ async function generatePefrReport() {
   const originalText = generatePefrReportButton.textContent;
   generatePefrReportButton.disabled = true;
   generatePefrReportButton.textContent = "Mengambil data…";
-  reportLoadStatus.textContent = "Meminta rekod terkini daripada Google Sheet…";
+  reportLoadStatus.textContent = "Meminta rekod terkini daripada Firebase…";
   try {
     const response = await sheetRequest("listAsthmaAssessments");
-    if (!response?.ok) throw new Error(response?.error || "Gagal membaca data Google Sheet.");
+    if (!response?.ok) throw new Error(response?.error || "Gagal membaca data Firebase.");
     const records = Array.isArray(response.records) ? response.records : [];
     sharedRecords = records;
     const period = reportPeriod();
@@ -718,7 +721,7 @@ form.addEventListener("submit", event => {
   renderRecords();
   renderStats();
   resetForm();
-  showToast("Rekod disimpan. Penyegerakan ke Google Sheet berjalan di belakang.");
+  showToast("Rekod disimpan. Penyegerakan ke Firebase berjalan di belakang.");
   void syncPendingInBackground();
 });
 
@@ -753,7 +756,7 @@ initPefrReport();
 renderPatientSuggestions();
 restoreDraft();
 syncNotice.hidden = Boolean(endpoint());
-if (!endpoint()) { syncNotice.hidden = false; syncNotice.textContent = "Google Sheet belum disambungkan. Rekod hanya boleh disimpan sementara pada peranti ini."; }
+if (!endpoint()) { syncNotice.hidden = false; syncNotice.textContent = "Firebase belum disambungkan. Rekod hanya boleh disimpan sementara pada peranti ini."; }
 updateNotDoneMode();
 syncPendingInBackground({ notify: false }).then(() => loadSharedRecords());
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");

@@ -1,8 +1,10 @@
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
+  linkWithPopup,
   onAuthStateChanged,
   setPersistence,
+  signInAnonymously,
   signInWithPopup,
   signOut
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
@@ -15,6 +17,13 @@ export async function prepareAuth() {
   return auth;
 }
 
+export async function ensureAppSession() {
+  await prepareAuth();
+  if (auth.currentUser) return auth.currentUser;
+  const credential = await signInAnonymously(auth);
+  return credential.user;
+}
+
 export function watchAuth(callback) {
   return onAuthStateChanged(auth, callback);
 }
@@ -25,7 +34,14 @@ export function currentUser() {
 
 export async function loginGoogle() {
   await prepareAuth();
-  const result = await signInWithPopup(auth, googleProvider);
+  const result = auth.currentUser?.isAnonymous
+    ? await linkWithPopup(auth.currentUser, googleProvider).catch(error => {
+        if (["auth/credential-already-in-use", "auth/email-already-in-use"].includes(error.code)) {
+          return signInWithPopup(auth, googleProvider);
+        }
+        throw error;
+      })
+    : await signInWithPopup(auth, googleProvider);
   return result.user;
 }
 

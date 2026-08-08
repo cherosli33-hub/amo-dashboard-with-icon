@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function staff() { return signedIn() && profile().active == true && profile().role in ['supervisor', 'admin']; }
+    function admin() { return signedIn() && profile().active == true && profile().role == 'admin'; }
+
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.role == 'pending' && request.resource.data.active == false;
+      allow read: if signedIn() && (request.auth.uid == uid || staff());
+      allow update: if admin() || (signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']));
+      allow delete: if false;
+    }
+
+    match /{collectionName}/{documentId} {
+      allow read, create, update: if signedIn() && collectionName in [
+        'procedure_cases', 'asthma_assessments', 'phc_inspections', 'phc_findings',
+        'girn_inspections', 'girn_findings'
+      ];
+      allow delete: if false;
+    }
+  }
+}

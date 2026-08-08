@@ -1,6 +1,7 @@
 window.AMO_CONFIG = Object.freeze({
-  // Existing Apps Script web app remains the shared Google Sheet backend.
-  apiUrl: "https://script.google.com/macros/s/AKfycbzifWmcwyfnJQ1yamRaEbondcxfmyiCUKeg_U7XryTD-kQoh3iitOMARH4aP6RcLH94/exec",
+  // Marker URL intercepted by shared/firebase/bootstrap.js. It is deliberately
+  // not a live Apps Script deployment, so a bridge failure cannot write to production.
+  apiUrl: "https://script.google.com/macros/s/firebase-v2-procedure/exec",
   writeEnabled: true,
-  environment: "production"
+  environment: "firebase-v2"
 });

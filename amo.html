@@ -233,6 +233,7 @@
   .ring-legend-row .label,.ring-legend-row .count{font-size:13px;}
 }
 </style>
+<script src="./shared/firebase/bootstrap.js?v=2"></script>
 <script src="./amo-config.js"></script>
 </head>
 <body>
@@ -437,11 +438,11 @@ async function saveCase(newCase){
   state.selectedProcs = {};
   state.saving = false;
   renderView();
-  showToast("Kes direkod. Sync ke Sheet...");
+  showToast("Kes direkod. Sync ke Firebase...");
   writeCasesCache(state.cases);
 
   if(!window.AMO_CONFIG.writeEnabled){
-    showToast("Mod ujian: tiada data dihantar ke Google Sheet");
+    showToast("Mod ujian: tiada data dihantar ke Firebase");
     return;
   }
 
@@ -459,11 +460,11 @@ async function saveCase(newCase){
       throw new Error("Server did not confirm success: " + resultText.slice(0,200));
     }
     state.syncError = false;
-    showToast("Sync ke Google Sheet selesai");
+    showToast("Sync ke Firebase selesai");
   }catch(e){
     console.error("Save failed:", e);
     state.syncError = true;
-    showToast("Data dipapar, tapi sync Sheet gagal");
+    showToast("Data dipapar, tapi sync Firebase gagal");
     renderView();
   }
 }
@@ -544,7 +545,7 @@ function renderDashboard(){
     ${state.syncError ? `
       <button class="sync-warn" onclick="loadCases()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 12c0-1 .4-2 1-3l1.4-1.4"></path><path d="M22 12c0 1-.4 2-1 3l-1.4 1.4"></path><line x1="2" y1="2" x2="22" y2="22"></line></svg>
-        <span>Tak dapat sync dengan Google Sheet. Data baru disimpan dalam app sahaja. Tekan untuk cuba lagi.</span>
+        <span>Tak dapat sync dengan Firebase. Data baru disimpan dalam app sahaja. Tekan untuk cuba lagi.</span>
       </button>
     ` : ""}
 
@@ -1026,7 +1027,7 @@ function procedureReportHtml(){
         <label>Syif<select onchange="updateReportFilter('shift',this.value)"><option value="all" ${state.reportShift === "all" ? "selected" : ""}>Semua syif</option>${SHIFTS.map(shift => `<option value="${shift.id}" ${state.reportShift === shift.id ? "selected" : ""}>${shift.label}</option>`).join("")}</select></label>
       </div>
       <button type="button" class="report-generate" onclick="generateProcedureReport()" ${state.reportLoading ? "disabled" : ""}>${state.reportLoading ? "Memuatkan data penuh…" : "Jana Laporan A4"}</button>
-      <p class="report-data-note">Data penuh dari Google Sheet hanya dimuatkan selepas butang ini ditekan.</p>
+      <p class="report-data-note">Data penuh dari Firebase hanya dimuatkan selepas butang ini ditekan.</p>
       ${state.reportError ? `<div class="sync-warn report-error">${esc(state.reportError)}</div>` : ""}
     </section>
     ${Array.isArray(state.reportCases) ? `<div class="report-actions"><span>${esc(reportDateRange().label)}</span><button type="button" onclick="window.print()">Cetak / Simpan PDF</button></div>${reportPreviewHtml(state.reportCases)}` : `<div class="report-placeholder">Pilih tempoh dan syif, kemudian tekan <strong>Jana Laporan A4</strong>.</div>`}`;
@@ -1217,7 +1218,7 @@ renderDashboard = function(){
   const html = `
     <div class="header"><div><div class="date">ETD &middot; ${esc(now.toLocaleDateString("ms-MY",{day:"numeric",month:"long",year:"numeric"}))}</div><h1>Assistant Medical Officer (A.M.O) Procedure Log</h1></div><div class="icon"><img src="./prosedur-icon.png?v=2.6.0" alt="Logo Log Prosedur A.M.O"></div></div>
     ${dashboardTabsHtml("summary")}
-    ${state.syncError ? `<button class="sync-warn" onclick="loadCases()"><span>Tak dapat sync dengan Google Sheet. Data baru disimpan dalam app sahaja. Tekan untuk cuba lagi.</span></button>` : ""}
+    ${state.syncError ? `<button class="sync-warn" onclick="loadCases()"><span>Tak dapat sync dengan Firebase. Data baru disimpan dalam app sahaja. Tekan untuk cuba lagi.</span></button>` : ""}
     <div class="ring-card"><div class="ring-row"><div class="ring-box"><svg width="168" height="168" viewBox="0 0 168 168" style="transform:rotate(-90deg)"><circle cx="84" cy="84" r="${R}" fill="none" stroke="#F1EEE5" stroke-width="14"/>${arcs.map(arc => `<circle cx="84" cy="84" r="${R}" fill="none" stroke="${arc.hex}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${arc.len} ${CIRC-arc.len}" stroke-dashoffset="${-arc.start}" opacity="${arc.id===currentShiftId ? 1 : 0.55}"/>`).join("")}</svg><div class="ring-center"><span class="num">${todayPatientCount}</span><span class="lbl">pesakit hari ini</span></div></div><div class="ring-legend">${SHIFTS.map(s => `<div class="ring-legend-row"><div class="ring-legend-left"><span class="dot" style="background:${s.hex}; ${s.id===currentShiftId ? `box-shadow:0 0 0 3px ${s.glow}` : ""}"></span><span class="label">${s.label}</span>${s.id===currentShiftId ? `<span class="now-tag">sekarang</span>` : ""}</div><span class="count">${shiftCount[s.id] || 0}</span></div>`).join("")}</div></div></div>
     <div class="section"><h2>Prosedur paling kerap</h2>${topProcedures.length === 0 ? `<div class="empty-note">Belum ada prosedur direkod hari ini.</div>` : topProcedures.map(([name,count],i) => `<div class="bar-row"><div class="bar-top"><span class="name">${esc(name)}</span><span class="count">${count}</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.max((count/maxProcCount)*100,5)}%; background:${i===0 ? "linear-gradient(90deg,#6FE3A8,#4FC890)" : "#E4E0D5"}"></div></div></div>`).join("")}</div>
     <div class="section"><h2>Trend 7 hari</h2><div class="trend-chart">${days.map(d => `<div class="trend-col"><span class="trend-count">${d.count || ""}</span><div class="trend-bar" style="height:${Math.max((d.count/maxDay)*100, d.count>0?6:2)}%; background:${d.isToday ? "linear-gradient(180deg,#6FE3A8,#2F8F66)" : "#E4E0D5"}"></div><span class="trend-label ${d.isToday ? "today" : ""}">${esc(d.label)}</span></div>`).join("")}</div></div>

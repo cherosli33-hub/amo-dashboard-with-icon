@@ -19,7 +19,8 @@ const types = {
 http.createServer((request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`);
   const requested = url.pathname === "/" ? "/index.html" : url.pathname;
-  const file = path.resolve(root, `.${decodeURIComponent(requested)}`);
+  let file = path.resolve(root, `.${decodeURIComponent(requested)}`);
+  if (file.startsWith(root + path.sep) && fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, "index.html");
   if (!file.startsWith(root + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     response.writeHead(404).end("Not found");
     return;

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b5f58">
+  <title>Dashboard Data Pusat · AMO Dashboard v2</title>
+  <link rel="stylesheet" href="./styles.css?v=2">
+</head>
+<body>
+  <header class="topbar">
+    <a href="../" aria-label="Kembali">←</a>
+    <div><small>AMO Dashboard v2</small><h1>Dashboard Data Pusat</h1></div>
+    <button id="logoutBtn" type="button">Log keluar</button>
+  </header>
+  <main>
+    <section id="gate" class="gate"><h2>Menyemak akses…</h2><p>Sesi Google yang sama digunakan untuk semua modul.</p></section>
+    <div id="dashboard" hidden>
+      <section class="summary" id="summary" aria-label="Ringkasan modul"></section>
+      <section class="panel">
+        <div class="toolbar">
+          <nav id="tabs" aria-label="Modul data"></nav>
+          <div class="filters">
+            <input id="searchInput" type="search" placeholder="Cari dalam rekod">
+            <button id="refreshBtn" type="button">Muat semula</button>
+            <button id="csvBtn" type="button">Eksport CSV</button>
+          </div>
+        </div>
+        <p id="status" role="status"></p>
+        <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="./app.js?v=2"></script>
+</body>
+</html>

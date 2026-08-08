@@ -11,7 +11,7 @@ import { db } from "./core.js";
 import { COLLECTIONS } from "./database.js";
 
 export const ROLES = Object.freeze({
-  PPP: "ppp",
+  PENDING: "pending",
   SUPERVISOR: "supervisor",
   ADMIN: "admin"
 });
@@ -34,8 +34,8 @@ export async function ensureProfile(user) {
     const profile = {
       email: user.email || "",
       name: user.displayName || "",
-      role: ROLES.PPP,
-      active: true,
+      role: ROLES.PENDING,
+      active: false,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp()
     };

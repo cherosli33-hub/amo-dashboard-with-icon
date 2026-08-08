@@ -64,7 +64,20 @@
       </a>
     </section>
 
-    <p class="portal-note">Sambungan internet diperlukan untuk Dashboard A.M.O serta penyegerakan Google Sheet modul Asma, PHC dan GIRN.</p>
+    <section class="portal-admin" aria-labelledby="adminTitle">
+      <div>
+        <p class="eyebrow">Akses terhad</p>
+        <h2 id="adminTitle">Admin / Penyelia</h2>
+        <p id="authMessage">Log masuk Google sekali untuk dashboard data dan semakan penyelia.</p>
+      </div>
+      <div class="portal-admin-actions">
+        <button type="button" id="loginBtn">Log masuk Google</button>
+        <a id="dataDashboardLink" href="./data-dashboard/" hidden>Dashboard data pusat</a>
+        <button type="button" id="logoutBtn" class="secondary" hidden>Log keluar</button>
+      </div>
+    </section>
+
+    <p class="portal-note">Semua modul menggunakan satu pangkalan data Firebase. Pengguna biasa tidak perlu log masuk.</p>
     <p class="portal-version">Prosedur v<span id="vProsedur">1.0</span> &middot; Asma v<span id="vAsthma">1.0</span> &middot; PHC v<span id="vPhc">2.6.1</span> &middot; GIRN v<span id="vGirn">1.1</span></p>
   </main>
   <div class="update-bar" id="updateBar" hidden role="status">
@@ -72,6 +85,7 @@
     <span class="update-bar-text"><strong>Versi baharu tersedia</strong><small>Tekan untuk kemas kini ke versi terkini</small></span>
     <button type="button" id="updateBtn">Kemas kini</button>
   </div>
+  <script type="module" src="./shared/firebase/portal-auth.js?v=2"></script>
   <script>
     // Nombor versi modul (portal). Naikkan bila ada perubahan Prosedur / Asthma.
     const MODULE_VERSIONS = { prosedur: "1.3", asthma: "1.1", phc: "2.6.1", girn: "1.1" };
