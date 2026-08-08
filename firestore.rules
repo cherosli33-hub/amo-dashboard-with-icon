@@ -2,16 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
+    function verifiedEmail(email) {
+      return signedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email == email;
+    }
+    function designatedAdmin() { return verifiedEmail('cherosli33@gmail.com'); }
+    function designatedSupervisor() { return verifiedEmail('yusseriharon6835@gmail.com'); }
     function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function staff() { return signedIn() && profile().active == true && profile().role in ['supervisor', 'admin']; }
     function admin() { return signedIn() && profile().active == true && profile().role == 'admin'; }
 
     match /users/{uid} {
       allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.role == 'pending' && request.resource.data.active == false;
+        && (
+          (designatedAdmin() && request.resource.data.role == 'admin' && request.resource.data.active == true)
+          || (designatedSupervisor() && request.resource.data.role == 'supervisor' && request.resource.data.active == true)
+          || (!designatedAdmin() && !designatedSupervisor()
+            && request.resource.data.role == 'pending' && request.resource.data.active == false)
+        );
       allow read: if signedIn() && (request.auth.uid == uid || staff());
-      allow update: if admin() || (signedIn() && request.auth.uid == uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']));
+      allow update: if admin()
+        || (signedIn() && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLoginAt']))
+        || (request.auth.uid == uid && designatedAdmin()
+          && request.resource.data.role == 'admin' && request.resource.data.active == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'name', 'role', 'active', 'lastLoginAt']))
+        || (request.auth.uid == uid && designatedSupervisor()
+          && request.resource.data.role == 'supervisor' && request.resource.data.active == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['email', 'name', 'role', 'active', 'lastLoginAt']));
       allow delete: if false;
     }
 

@@ -16,6 +16,15 @@ export const ROLES = Object.freeze({
   ADMIN: "admin"
 });
 
+export const STAFF_ACCESS = Object.freeze({
+  "cherosli33@gmail.com": ROLES.ADMIN,
+  "yusseriharon6835@gmail.com": ROLES.SUPERVISOR
+});
+
+function assignedRole(email) {
+  return STAFF_ACCESS[String(email || "").trim().toLowerCase()] || null;
+}
+
 // Baca profil pengguna dari koleksi users
 export async function getProfile(uid) {
   if (!uid) return null;
@@ -29,13 +38,14 @@ export async function ensureProfile(user) {
   if (!user?.uid) throw new Error("Pengguna tidak sah.");
   const ref = doc(db, COLLECTIONS.users, user.uid);
   const snap = await getDoc(ref);
+  const approvedRole = assignedRole(user.email);
 
   if (!snap.exists()) {
     const profile = {
       email: user.email || "",
       name: user.displayName || "",
-      role: ROLES.PENDING,
-      active: false,
+      role: approvedRole || ROLES.PENDING,
+      active: Boolean(approvedRole),
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp()
     };
@@ -43,8 +53,15 @@ export async function ensureProfile(user) {
     return { uid: user.uid, ...profile };
   }
 
-  await setDoc(ref, { lastLoginAt: serverTimestamp() }, { merge: true });
-  return { uid: user.uid, ...snap.data() };
+  const updates = { lastLoginAt: serverTimestamp() };
+  if (approvedRole) {
+    updates.email = user.email || "";
+    updates.name = user.displayName || snap.data().name || "";
+    updates.role = approvedRole;
+    updates.active = true;
+  }
+  await setDoc(ref, updates, { merge: true });
+  return { uid: user.uid, ...snap.data(), ...updates };
 }
 
 export function hasRole(profile, ...roles) {

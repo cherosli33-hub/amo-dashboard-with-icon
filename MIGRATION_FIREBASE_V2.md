@@ -39,6 +39,11 @@ Importer idempotent berada di `tools/firebase-import/import.mjs`. Ia menjalankan
 
 ## Konfigurasi manual yang masih wajib
 
+- Akaun staf yang telah diluluskan dalam kod dan Firestore Rules:
+  - Admin: `cherosli33@gmail.com`
+  - Supervisor: `yusseriharon6835@gmail.com`
+- Kedua-dua akaun menerima peranan secara automatik pada login Google pertama selepas rules dideploy.
+
 1. Firebase Authentication: aktifkan `Anonymous` dan `Google`.
 2. Authentication > Settings > Authorized domains: tambah domain `pages.dev` dan custom domain Cloudflare.
 3. Deploy `firestore.rules` dan `firestore.indexes.json` ke project `amo-dashboard-v2`.
