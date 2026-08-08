@@ -37,20 +37,25 @@ Pengguna biasa mendapat sesi Firebase Anonymous secara senyap; tiada skrin login
 
 Importer idempotent berada di `tools/firebase-import/import.mjs`. Ia menjalankan dry-run secara lalai dan hanya menulis apabila diberi `--commit`. Jangan commit kunci service account.
 
-## Konfigurasi manual yang masih wajib
+## Konfigurasi dan deployment selesai (9 Ogos 2026)
 
 - Akaun staf yang telah diluluskan dalam kod dan Firestore Rules:
   - Admin: `cherosli33@gmail.com`
   - Supervisor: `yusseriharon6835@gmail.com`
-- Kedua-dua akaun menerima peranan secara automatik pada login Google pertama selepas rules dideploy.
+- Kedua-dua akaun menerima peranan secara automatik pada login Google pertama.
+- Firebase Authentication `Anonymous` dan `Google` telah diaktifkan; auto-cleanup anonymous 30 hari turut aktif.
+- Firestore Rules telah diterbitkan dan domain `amo-dashboard-v2.pages.dev` telah ditambah kepada Authorized Domains.
+- Cloudflare Pages menggunakan branch production `firebase-v2`, build command kosong dan output directory `/`.
+- URL deployment: `https://amo-dashboard-v2.pages.dev/`.
+- Import sebenar selesai secara idempotent: 781 Prosedur, 53 Asma, 73 PHC, 100 PHC findings, 31 GIRN dan 21 GIRN findings.
+- Login admin, SSO, dashboard pusat dan paparan semua empat modul telah disahkan pada domain Cloudflare.
 
-1. Firebase Authentication: aktifkan `Anonymous` dan `Google`.
-2. Authentication > Settings > Authorized domains: tambah domain `pages.dev` dan custom domain Cloudflare.
-3. Deploy `firestore.rules` dan `firestore.indexes.json` ke project `amo-dashboard-v2`.
-4. Login Google sekali di portal. Dalam Firestore `users/{uid}`, tukar akaun pertama kepada `role: admin`, `active: true`; akaun penyelia kepada `role: supervisor`, `active: true`.
-5. Jalankan importer dahulu tanpa `--commit`, bandingkan kiraan, kemudian jalankan dengan `--commit` menggunakan Application Default Credentials/service account yang tidak disimpan dalam repo.
-6. Cloudflare Pages: sambungkan repo dan pilih branch `firebase-v2`, root directory `/`, build command kosong, output directory `/`. Jangan pilih `main`.
-7. Selepas deploy, uji tambah/baca satu rekod ujian bagi setiap modul, SSO, logout, pengesahan PHC, status GIRN, laporan dan eksport CSV sebelum sebarang cutover.
+## Ujian penerimaan sebelum dibuka kepada pengguna
+
+1. Login sekali menggunakan akaun supervisor dan sahkan akses PHC serta dashboard data pusat.
+2. Simpan satu rekod ujian baharu bagi setiap modul, kemudian sahkan bacaan semula pada peranti lain.
+3. Uji logout, pengesahan PHC, status tindakan GIRN, laporan dan eksport CSV.
+4. Custom domain adalah pilihan; domain `pages.dev` sudah berfungsi tanpa pembelian domain.
 
 ## Cutover dan rollback
 
