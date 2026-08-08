@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDoc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc
+  collection, doc, getDoc, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, updateDoc
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import { auth, db } from "./core.js";
 import { ensureAppSession } from "./auth.js";
@@ -61,7 +61,7 @@ function jsonResponse(payload, status = 200) {
 async function procedureRequest(action, body) {
   if (action === "data") {
     const records = (await list(COLLECTIONS.procedure)).sort((a, b) => String(a.savedAt).localeCompare(String(b.savedAt)));
-    const rows = [["Timestamp", "Date", "Time", "Shift", "Zone", "IDPesakit", "Procedure", "DurationMinutes"]];
+    const rows = [["Timestamp", "Date", "Time", "Shift", "Zone", "IDPesakit", "Procedure", "DurationMinutes", "OrderedBy"]];
     records.forEach(record => (record.procedures || []).forEach(procedure => rows.push([
       record.savedAt || record.timestamp || record.id,
       record.date,
@@ -70,7 +70,8 @@ async function procedureRequest(action, body) {
       record.zone || "",
       record.registrationNumber || record.patientId || "",
       procedure.name,
-      Number(procedure.minutes || 0)
+      Number(procedure.minutes || 0),
+      procedure.orderedBy || ""
     ])));
     return rows;
   }
@@ -135,8 +136,13 @@ async function savePhcInspection(record) {
     createdBy: auth.currentUser?.uid || ""
   });
   const shortages = items.filter(item => Number(item.qty) < Number(item.standard));
+  const existingFindings = await list(COLLECTIONS.phcFindings);
   for (let index = 0; index < shortages.length; index += 1) {
     const finding = phcFinding(record, shortages[index], index);
+    const priorOpen = existingFindings
+      .filter(item => item.type === "shortage" && item.item === finding.item && String(item.bagShift || "").startsWith(`${record.bag} /`) && item.status === "Belum diambil tindakan")
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))[0];
+    if (priorOpen) finding.id = priorOpen.id;
     const ref = doc(db, COLLECTIONS.phcFindings, finding.id);
     const current = await getDoc(ref);
     const prior = current.exists() ? plain(current.data()) : null;
@@ -175,7 +181,15 @@ async function phcRequest(action, params, body) {
     if (action === "latestInventory") {
       const latest = {};
       records.forEach(record => { if (!latest[record.bag] || String(record.savedAt) > String(latest[record.bag].savedAt)) latest[record.bag] = record; });
-      records = Object.values(latest);
+      const resolved = (await list(COLLECTIONS.phcFindings)).filter(item => item.type === "shortage" && item.status !== "Belum diambil tindakan");
+      records = Object.values(latest).map(record => {
+        const copy = structuredClone(record);
+        Object.values(copy.quantities || {}).forEach(group => (group.items || []).forEach(item => {
+          const restored = resolved.some(finding => finding.item === item.name && String(finding.bagShift || "").startsWith(`${record.bag} /`) && String(finding.actionAt || finding.updatedAt || "") > String(record.savedAt || ""));
+          if (restored && Number(item.qty) < Number(item.standard)) item.qty = Number(item.standard);
+        }));
+        return copy;
+      });
     }
     if (action === "dashboard") {
       const findings = (await list(COLLECTIONS.phcFindings)).filter(item => inRange(item, params.from, params.to));
@@ -285,6 +299,24 @@ export async function firebaseRequest({ module, action, method = "GET", record =
   if (module === "phc") return phcRequest(action, params, payload);
   if (module === "girn") return girnRequest(action, payload);
   throw new Error("Modul Firebase tidak dikenali.");
+}
+
+export function subscribeModule(moduleName, callback, onError) {
+  const collectionName = {
+    procedure: COLLECTIONS.procedure,
+    asthma: COLLECTIONS.asthma,
+    phc: COLLECTIONS.phc,
+    girn: COLLECTIONS.girn,
+    girnFindings: COLLECTIONS.girnFindings
+  }[moduleName];
+  if (!collectionName) throw new Error("Modul Firebase tidak dikenali.");
+  let stop = () => {};
+  ensureAppSession().then(() => {
+    stop = onSnapshot(query(collection(db, collectionName), limit(5000)), snapshot => {
+      callback(snapshot.docs.map(item => ({ id: item.id, ...plain(item.data()) })));
+    }, onError);
+  }).catch(onError);
+  return () => stop();
 }
 
 export async function firebaseFetch(input, init = {}) {

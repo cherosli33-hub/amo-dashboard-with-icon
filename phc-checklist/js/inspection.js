@@ -4,6 +4,9 @@ import { saveInspection, apiConfigured, fetchLatestInventory } from "./api.js";
 const root=document.querySelector("#inspectionApp");
 const title=document.querySelector("#inspectionTitle");
 const state={stage:"setup",bag:"",ppp:"",shift:"",categoryIndex:0,quantities:{},notes:"",startMode:"new",saving:false,saveResult:null};
+const PPP_NAMES_KEY="phc-inspector-names-v1";
+function inspectorNames(){ try{ const value=JSON.parse(localStorage.getItem(PPP_NAMES_KEY)||"[]"); return Array.isArray(value)?value:[]; }catch{return [];} }
+function rememberInspector(name){ const key=String(name||"").trim(); if(!key)return; const names=[key,...inspectorNames().filter(item=>item.toLocaleLowerCase("ms-MY")!==key.toLocaleLowerCase("ms-MY"))].slice(0,100); localStorage.setItem(PPP_NAMES_KEY,JSON.stringify(names)); }
 
 function toast(message){ const el=document.querySelector("#toast"); el.textContent=message; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2200); }
 function esc(value=""){ return String(value).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c])); }
@@ -20,7 +23,7 @@ async function buildQuantities(mode){
   state.startMode=mode; state.quantities={}; categories.forEach(category=>{ const previous=mode==="copy"?last?.quantities?.[category.id]?.items:null; state.quantities[category.id]={items:category.items.map(([name,standard])=>({name,standard,qty:Math.min(standard,previous?.find(item=>item.name===name)?.qty ?? standard)}))}; });
 }
 
-function renderSetup(){ title.textContent="Maklumat pemeriksaan"; root.innerHTML=`<section class="setup-panel"><div class="setup-hero"><div class="step-icon">▣</div><p class="eyebrow">LANGKAH 1</p><h1>Mulakan pemeriksaan</h1><p>Pilih beg, masukkan nama PPP dan shift bertugas.</p></div><div class="card form-card"><div class="field"><label class="field-label">Pilih beg PHC</label><div class="choice-grid"><button class="choice ${state.bag==="PHC 1"?"selected":""}" data-bag="PHC 1"><span>①</span>PHC 1<small> · 7 kategori</small></button><button class="choice ${state.bag==="PHC 2"?"selected":""}" data-bag="PHC 2"><span>②</span>PHC 2<small> · 6 kategori</small></button></div></div><div class="field"><label class="field-label" for="pppName">Nama PPP</label><input class="text-input" id="pppName" autocomplete="name" placeholder="Contoh: Rosli" value="${esc(state.ppp)}"></div><div class="field"><label class="field-label">Shift</label><div class="choice-grid shift-grid">${["Pagi","Petang","Malam"].map((shift,i)=>`<button class="choice ${state.shift===shift?"selected":""}" data-shift="${shift}"><span>${["☀","◐","☾"][i]}</span>${shift}</button>`).join("")}</div></div><div class="field"><label class="field-label">Cara mula pemeriksaan</label><div class="start-options"><button class="start-option copy" data-start-mode="copy" ${!state.bag||!state.shift?"disabled":""}><span>↻</span><div><strong>Salin Rekod Terakhir</strong><small>Gunakan kuantiti pemeriksaan lepas</small></div></button><button class="start-option new" data-start-mode="new" ${!state.bag||!state.shift?"disabled":""}><span>＋</span><div><strong>Mulakan Rekod Baru</strong><small>Mulakan dengan kuantiti standard</small></div></button></div></div></div></section>`;
+function renderSetup(){ title.textContent="Maklumat pemeriksaan"; root.innerHTML=`<section class="setup-panel"><div class="setup-hero"><div class="step-icon">▣</div><p class="eyebrow">LANGKAH 1</p><h1>Mulakan pemeriksaan</h1><p>Pilih beg, masukkan nama PPP dan shift bertugas.</p></div><div class="card form-card"><div class="field"><label class="field-label">Pilih beg PHC</label><div class="choice-grid"><button class="choice ${state.bag==="PHC 1"?"selected":""}" data-bag="PHC 1"><span>①</span>PHC 1<small> · 7 kategori</small></button><button class="choice ${state.bag==="PHC 2"?"selected":""}" data-bag="PHC 2"><span>②</span>PHC 2<small> · 6 kategori</small></button></div></div><div class="field"><label class="field-label" for="pppName">Nama PPP</label><input class="text-input" id="pppName" list="pppNameSuggestions" autocomplete="name" placeholder="Contoh: Rosli" value="${esc(state.ppp)}"><datalist id="pppNameSuggestions">${inspectorNames().map(name=>`<option value="${esc(name)}"></option>`).join("")}</datalist></div><div class="field"><label class="field-label">Shift</label><div class="choice-grid shift-grid">${["Pagi","Petang","Malam"].map((shift,i)=>`<button class="choice ${state.shift===shift?"selected":""}" data-shift="${shift}"><span>${["☀","◐","☾"][i]}</span>${shift}</button>`).join("")}</div></div><div class="field"><label class="field-label">Cara mula pemeriksaan</label><div class="start-options"><button class="start-option copy" data-start-mode="copy" ${!state.bag||!state.shift?"disabled":""}><span>↻</span><div><strong>Salin Rekod Terakhir</strong><small>Gunakan kuantiti pemeriksaan lepas</small></div></button><button class="start-option new" data-start-mode="new" ${!state.bag||!state.shift?"disabled":""}><span>＋</span><div><strong>Mulakan Rekod Baru</strong><small>Mulakan dengan kuantiti standard</small></div></button></div></div></div></section>`;
 }
 
 function renderCategory(){
@@ -36,6 +39,23 @@ function renderReview(){
 }
 function renderSuccess(){ const synced=state.saveResult?.synced; title.textContent="Pemeriksaan selesai"; root.innerHTML=`<section class="card success-panel"><div class="success-check">✓</div><h1>Pemeriksaan berjaya</h1><p>${state.bag} · ${state.shift}<br>Direkod atas nama ${esc(state.ppp)}</p><div class="sync-message ${synced?"synced":"pending"}"><strong>${synced?"✓ Tersimpan dalam Firebase":"↻ Menunggu sync"}</strong><br>${esc(state.saveResult?.message||"")}</div><button class="button primary full" onclick="location.href='index.html'">Kembali ke Dashboard</button></section>`; }
 
+const renderReviewBase=renderReview;
+renderReview=function(){
+  renderReviewBase();
+  const lows=Object.values(state.quantities).flatMap(group=>group.items||[]).filter(item=>item.qty<item.standard);
+  if(!lows.length) return;
+  const detail=document.createElement("div"); detail.className="review-row shortage-detail";
+  detail.innerHTML=`<span>Butiran kekurangan</span><strong>${lows.map(item=>`${esc(item.name)} (${item.qty}/${item.standard})`).join("<br>")}</strong>`;
+  document.querySelector(".review-list")?.appendChild(detail);
+};
+
+renderSuccess=function(){
+  const synced=state.saveResult?.synced;
+  const lows=Object.values(state.quantities).flatMap(group=>group.items||[]).filter(item=>item.qty<item.standard);
+  title.textContent="Pemeriksaan selesai";
+  root.innerHTML=`<section class="card success-panel"><div class="success-check">✓</div><h1>Pemeriksaan berjaya</h1><p>${state.bag} · ${state.shift}<br>Direkod atas nama ${esc(state.ppp)}</p>${lows.length?`<div class="sync-message pending"><strong>Item kurang (${lows.length})</strong><br>${lows.map(item=>`${esc(item.name)}: ${item.qty}/${item.standard}`).join("<br>")}</div>`:`<div class="sync-message synced"><strong>✓ Semua item lengkap</strong></div>`}<div class="sync-message ${synced?"synced":"pending"}"><strong>${synced?"✓ Tersimpan dalam Firebase":"↻ Menunggu sync"}</strong><br>${esc(state.saveResult?.message||"")}</div><button class="button primary full" onclick="location.href='index.html'">Kembali ke Dashboard</button></section>`;
+};
+
 function render(){ if(state.stage==="setup") renderSetup(); else if(state.stage==="category") renderCategory(); else if(state.stage==="review") renderReview(); else renderSuccess(); window.scrollTo({top:0,behavior:"smooth"}); }
 
 root.addEventListener("click",async event=>{
@@ -44,6 +64,7 @@ root.addEventListener("click",async event=>{
   const startButton=event.target.closest("[data-start-mode]"); if(startButton){
     state.ppp=document.querySelector("#pppName").value.trim();
     if(!state.ppp){ document.querySelector("#pppName").focus(); toast("Masukkan nama PPP dahulu."); return; }
+    rememberInspector(state.ppp);
     const mode=startButton.dataset.startMode;
     if(mode==="copy"){ startButton.disabled=true; toast("Menyemak status stok terkini..."); }
     await buildQuantities(mode);

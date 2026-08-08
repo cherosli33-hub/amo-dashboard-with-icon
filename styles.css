@@ -326,6 +326,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .pefr-print-report { transform: scale(.34); margin-bottom: -138mm; }
 }
 
+.draft-manager{margin-bottom:16px;padding:15px}.draft-manager-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.draft-manager-head small{color:var(--primary);font-size:10px;font-weight:800;letter-spacing:.12em}.draft-manager-head h2{margin:3px 0 0;font-size:16px}.draft-manager-head .btn{width:auto}.draft-list{display:grid;gap:8px;margin-top:12px}.draft-item{display:flex;align-items:center;gap:9px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface-soft)}.draft-item.active{border-color:var(--primary)}.draft-copy{min-width:0;flex:1}.draft-copy strong,.draft-copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.draft-copy small{margin-top:2px;color:var(--text-muted)}.draft-item button{padding:7px 9px;border:0;border-radius:8px;font:inherit;font-size:12px;font-weight:700}.draft-open{background:var(--primary);color:#fff}.draft-delete{background:#f7e8e8;color:#a23838}.draft-empty{margin:0;color:var(--text-muted);font-size:13px}@media(max-width:520px){.draft-manager-head{align-items:flex-start;flex-direction:column}.draft-manager-head .btn{width:100%}}
+
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
   body { background: white; }

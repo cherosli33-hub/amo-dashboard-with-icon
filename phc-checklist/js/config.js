@@ -1,4 +1,4 @@
-export const APP_VERSION = "2.7.0-supervisor";
+export const APP_VERSION = "2.8.0-firebase";
 // Isi selepas OAuth Web Client dibuat. Nilai yang sama mesti disimpan sebagai
 // GOOGLE_OAUTH_CLIENT_ID dalam Apps Script > Project Settings > Script Properties.
 export const GOOGLE_OAUTH_CLIENT_ID = "655335153298-0cljukftkn09gsl2j2mcl758cmq9k5h7.apps.googleusercontent.com";

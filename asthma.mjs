@@ -2,6 +2,7 @@ import { PAEDIATRIC_PEFR, predictedAdultPef, predictedPaediatricPef, pefrPercent
 
 const PENDING_KEY = "amo-etd-asthma-pending-v2";
 const DRAFT_KEY = "amo-etd-asthma-draft-v1";
+const DRAFTS_KEY = "amo-etd-asthma-drafts-v2";
 const PATIENT_HISTORY_KEY = "amo-etd-asthma-patient-history-v1";
 const PATIENT_HISTORY_LIMIT = 500;
 const form = document.querySelector("#assessmentForm");
@@ -39,6 +40,7 @@ let sharedRecords = [];
 let formDirty = false;
 let pendingSyncPromise = null;
 let draftTimer = null;
+let activeDraftId = null;
 
 function endpoint() { return window.ASTHMA_CONFIG?.sheetEndpoint?.trim() || ""; }
 function requestTimeout() { return Number(window.ASTHMA_CONFIG?.requestTimeoutMs) || 15000; }
@@ -160,6 +162,7 @@ function draftSnapshot() {
     else fields[control.name] = control.value;
   });
   return {
+    id: activeDraftId || (crypto.randomUUID ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`),
     fields,
     dateMode,
     customDate: document.querySelector("#customDate").value,
@@ -167,9 +170,19 @@ function draftSnapshot() {
     savedAt: new Date().toISOString()
   };
 }
+function getDrafts() {
+  try { const value=JSON.parse(localStorage.getItem(DRAFTS_KEY)||"[]"); return Array.isArray(value)?value:[]; }
+  catch { return []; }
+}
+function storeDrafts(drafts) { localStorage.setItem(DRAFTS_KEY,JSON.stringify(drafts.slice(0,20))); renderDraftManager(); }
 function saveDraft() {
   if (!formDirty) return;
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draftSnapshot())); } catch { /* storage unavailable */ }
+  try {
+    const snapshot=draftSnapshot(); activeDraftId=snapshot.id;
+    const drafts=getDrafts().filter(item=>item.id!==snapshot.id);
+    storeDrafts([snapshot,...drafts]);
+    localStorage.removeItem(DRAFT_KEY);
+  } catch { /* storage unavailable */ }
 }
 function scheduleDraftSave() {
   window.clearTimeout(draftTimer);
@@ -177,12 +190,13 @@ function scheduleDraftSave() {
 }
 function clearDraft() {
   window.clearTimeout(draftTimer);
+  if(activeDraftId) storeDrafts(getDrafts().filter(item=>item.id!==activeDraftId));
+  activeDraftId=null;
   localStorage.removeItem(DRAFT_KEY);
 }
-function restoreDraft() {
-  let draft;
-  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch { return; }
+function applyDraft(draft) {
   if (!draft?.fields) return;
+  activeDraftId=draft.id;
   Object.entries(draft.fields).forEach(([name, value]) => {
     const controls = [...form.elements].filter(control => control.name === name);
     controls.forEach(control => {
@@ -199,6 +213,33 @@ function restoreDraft() {
   formDirty = true;
   updateNotDoneMode();
   calculateAll();
+  renderDraftManager();
+}
+function restoreDraft() {
+  let drafts=getDrafts();
+  try {
+    const legacy=JSON.parse(localStorage.getItem(DRAFT_KEY)||"null");
+    if(legacy?.fields){ legacy.id=legacy.id||`draft-${Date.now()}`; drafts=[legacy,...drafts]; storeDrafts(drafts); localStorage.removeItem(DRAFT_KEY); }
+  } catch { /* ignore */ }
+  if(drafts[0]) applyDraft(drafts[0]);
+  else renderDraftManager();
+}
+function draftLabel(draft) {
+  const name=String(draft?.fields?.patientName||"").trim();
+  const id=String(draft?.fields?.patientId||"").trim();
+  return name||id||"Pesakit belum dinamakan";
+}
+function renderDraftManager() {
+  const target=document.querySelector("#draftList"); if(!target) return;
+  const drafts=getDrafts();
+  target.innerHTML=drafts.length?drafts.map(draft=>`<article class="draft-item ${draft.id===activeDraftId?"active":""}" data-draft-id="${escapeHtml(draft.id)}"><div class="draft-copy"><strong>${escapeHtml(draftLabel(draft))}</strong><small>${escapeHtml(draft.fields?.patientId||"ID belum diisi")} · disimpan ${new Date(draft.savedAt).toLocaleString("ms-MY")}</small></div><button class="draft-open" type="button">Sambung</button><button class="draft-delete" type="button" aria-label="Padam draf ${escapeHtml(draftLabel(draft))}">Padam</button></article>`).join(""):'<p class="draft-empty">Tiada draf lain. Borang aktif akan disimpan automatik.</p>';
+}
+function startNextPatient() {
+  saveDraft();
+  activeDraftId=null;
+  resetForm({preserveDrafts:true});
+  renderDraftManager();
+  showToast("Draf disimpan. Borang pesakit baharu tersedia.");
 }
 
 function populatePaediatricHeights() {
@@ -453,8 +494,8 @@ function showToast(message) {
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => toast.classList.remove("is-visible"), 3500);
 }
-function resetForm() {
-  clearDraft();
+function resetForm({ preserveDrafts = false } = {}) {
+  if (!preserveDrafts) clearDraft();
   form.reset();
   document.querySelector('input[name="patientType"][value="adult"]').checked = true;
   document.querySelector('input[name="uptriage"][value="None"]').checked = true;
@@ -726,6 +767,25 @@ form.addEventListener("submit", event => {
 });
 
 document.querySelector("#resetButton").addEventListener("click", resetForm);
+document.querySelector("#newPatientDraft").addEventListener("click",startNextPatient);
+document.querySelector("#draftList").addEventListener("click",event=>{
+  const item=event.target.closest("[data-draft-id]"); if(!item) return;
+  const id=item.dataset.draftId;
+  if(event.target.closest(".draft-delete")){
+    if(!confirm("Padam draf pesakit ini?")) return;
+    storeDrafts(getDrafts().filter(draft=>draft.id!==id));
+    if(activeDraftId===id){ activeDraftId=null; resetForm({preserveDrafts:true}); }
+    renderDraftManager(); return;
+  }
+  if(event.target.closest(".draft-open")){
+    saveDraft();
+    const draft=getDrafts().find(item=>item.id===id); if(!draft) return;
+    resetForm({preserveDrafts:true}); applyDraft(draft); window.scrollTo({top:0,behavior:"smooth"});
+  }
+});
+document.querySelector(".back-link").addEventListener("click",()=>saveDraft());
+window.addEventListener("pagehide",()=>saveDraft());
+window.addEventListener("beforeunload",()=>saveDraft());
 document.querySelector("#recordSearch").addEventListener("input", renderRecords);
 document.querySelector("#recordSearch").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); renderRecords(); } });
 document.querySelector("#searchRecords").addEventListener("click", renderRecords);

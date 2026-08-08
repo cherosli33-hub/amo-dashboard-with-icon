@@ -40,15 +40,20 @@ function currentLowItems(){
   // Sheet ialah sumber utama: findingId sentiasa ID sebenar dari PENEMUAN,
   // dan SEMUA shift yang belum diambil tindakan disenaraikan (bukan shift terbaru sahaja).
   const actions=loadRestockActions();
-  return findings
+  const latestByItem=new Map();
+  findings
     .filter(finding=>finding.type==="shortage"&&finding.status==="Belum diambil tindakan")
-    .map(finding=>{
+    .forEach(finding=>{
       const parts=String(finding.bagShift||"").split(" / ");
-      return {name:finding.item,qty:finding.qty,standard:finding.standard,
+      const item={name:finding.item,qty:finding.qty,standard:finding.standard,
         bag:parts[0]||"",shift:parts[1]||"",date:finding.date,recordId:finding.inspectionId,
         findingId:finding.id,findingStatus:finding.status,
         key:`${finding.inspectionId}|${finding.item}`};
-    })
+      const dedupeKey=`${item.bag}|${item.name}`;
+      const current=latestByItem.get(dedupeKey);
+      if(!current||String(item.date||"")>=String(current.date||"")) latestByItem.set(dedupeKey,item);
+    });
+  return [...latestByItem.values()]
     // hanya sembunyi jika tindakan BENAR-BENAR sudah sampai ke Firebase
     .filter(item=>actions[item.key]?.syncStatus!=="SYNCED");
 }

@@ -31,6 +31,7 @@ const ASSETS = [
   "./apple-touch-icon.png?v=4",
   "./favicon.png?v=4",
   "./girn/girn-radio-logo.jpg?v=1",
+  "./girn/girn-enhancements.js?v=1",
   "./girn/",
   "./girn/index.html",
   "./references/adult-pefr-chart.jpeg",

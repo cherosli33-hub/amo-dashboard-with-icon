@@ -5,6 +5,15 @@
   window.AMOFirebaseRequest = function (request) {
     return import(adapterUrl).then(module => module.firebaseRequest(request));
   };
+  window.AMOSubscribe = function (moduleName, callback, onError) {
+    let stop = null;
+    let cancelled = false;
+    import(adapterUrl).then(module => {
+      if (cancelled) return;
+      stop = module.subscribeModule(moduleName, callback, onError);
+    }).catch(error => onError?.(error));
+    return () => { cancelled = true; stop?.(); };
+  };
   window.fetch = function (input, init) {
     const raw = typeof input === "string" ? input : input?.url || "";
     let hostname = "";
@@ -14,4 +23,10 @@
     }
     return nativeFetch(input, init);
   };
+  if (location.pathname.startsWith("/girn")) {
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = "/girn/girn-enhancements.js?v=1";
+    document.head.appendChild(script);
+  }
 })();

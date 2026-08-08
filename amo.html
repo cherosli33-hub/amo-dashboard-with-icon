@@ -851,6 +851,24 @@ state.selectedZone = null;
 state.registrationNumber = ""; // ID Pesakit
 
 const AMO_CASE_CACHE_KEY = "amo-procedure-cases-v1";
+const AMO_DOCTOR_MEMORY_KEY = "amo-procedure-doctors-v1";
+const DEFAULT_DOCTORS = ["Dr Amira","Dr Hakim","Dr Hakimi","Dr Magesh","Dr Faizal","Dr Diyana","Dr Aiman","Dr Woon","Dr Ying","Dr Hazani","Dr Faezah","Dr Anum","Dr Hafis","Dr Syahirah","Dr Ismail"];
+
+function doctorSuggestions(){
+  let learned = [];
+  try{ learned = JSON.parse(localStorage.getItem(AMO_DOCTOR_MEMORY_KEY) || "[]"); }catch(_){ /* optional */ }
+  const seen = new Set();
+  return [...DEFAULT_DOCTORS,...(Array.isArray(learned) ? learned : [])].filter(name => {
+    const key = String(name || "").trim().toLocaleLowerCase("ms-MY");
+    if(!key || seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+}
+
+function rememberDoctors(procedures){
+  const names = procedures.map(item => String(item.orderedBy || "").trim()).filter(Boolean);
+  localStorage.setItem(AMO_DOCTOR_MEMORY_KEY, JSON.stringify([...names,...doctorSuggestions()].slice(0,50)));
+}
 
 function readCasesCache(){
   try{
@@ -880,6 +898,7 @@ function casesFromSheetRows(rows, limitToTrend = true){
     reg: findIndex("IDPesakit", findIndex("ID Pesakit", findIndex("RegistrationNumber", hasZoneColumns ? 5 : -1))),
     procedure: findIndex("Procedure", hasZoneColumns ? 6 : 4),
     minutes: findIndex("DurationMinutes", hasZoneColumns ? 7 : 5),
+    orderedBy: findIndex("OrderedBy", 8),
   };
   const grouped = {};
   const trendDateKeys = visibleTrendDateKeys();
@@ -895,7 +914,7 @@ function casesFromSheetRows(rows, limitToTrend = true){
     if(!grouped[key]) grouped[key] = { id: `remote_${idx}_${ts}`, date: dateKey, time, shift, zone, registrationNumber, procedures: [] };
     const durMin = Number(row[col.minutes]);
     const durMatch = DURATIONS.find(d => d.minutes === durMin);
-    grouped[key].procedures.push({ name: normalizeProcedureNameV2(row[col.procedure]), minutes: durMin, durationLabel: durMatch ? durMatch.label : `${durMin} min` });
+    grouped[key].procedures.push({ name: normalizeProcedureNameV2(row[col.procedure]), minutes: durMin, durationLabel: durMatch ? durMatch.label : `${durMin} min`, orderedBy: col.orderedBy >= 0 ? String(row[col.orderedBy] || "").trim() : "" });
   });
   return Object.values(grouped);
 }
@@ -917,7 +936,7 @@ function recordShiftFiltersHtml(){
 }
 
 function dashboardTabsHtml(activeTab){
-  return `<nav class="dashboard-tabs" aria-label="Paparan Prosedur">
+  return `<a class="dashboard-home-link" href="./" aria-label="Kembali ke menu utama">‹ Menu utama</a><nav class="dashboard-tabs" aria-label="Paparan Prosedur">
     <button type="button" class="dashboard-tab ${activeTab === "summary" ? "active" : ""}" onclick="setDashboardTab('summary')">Dashboard</button>
     <button type="button" class="dashboard-tab ${activeTab === "records" ? "active" : ""}" onclick="setDashboardTab('records')">Rekod Hari Ini</button>
     <button type="button" class="dashboard-tab ${activeTab === "report" ? "active" : ""}" onclick="setDashboardTab('report')">Laporan</button>
@@ -995,17 +1014,23 @@ function reportPreviewHtml(cases){
   const range = reportDateRange();
   const shiftLabel = state.reportShift === "all" ? "Semua syif" : `Syif ${shiftMeta(state.reportShift)?.label || state.reportShift}`;
   const procedureTotal = cases.reduce((sum,item) => sum + item.procedures.length, 0);
-  const minutesTotal = cases.reduce((sum,item) => sum + item.procedures.reduce((subtotal,proc) => subtotal + (Number(proc.minutes) || 0), 0), 0);
-  const rows = cases.flatMap(item => item.procedures.map(proc => {
-    const shift = shiftMeta(item.shift);
-    const zone = zoneMeta(item.zone);
-    return `<tr><td>${esc(formatReportDate(item.date))}</td><td>${esc(String(item.time || "—"))}</td><td>${esc(shift?.label || item.shift || "—")}</td><td>${esc(zone?.label || "—")}</td><td>${esc(String(item.registrationNumber || item.patientId || "—"))}</td><td>${esc(proc.name || "—")}</td><td class="report-number">${Number(proc.minutes) || 0}</td></tr>`;
-  })).join("");
+  const aggregates = new Map();
+  cases.forEach(item => item.procedures.forEach(proc => {
+    const name = proc.name || "Tidak dinyatakan";
+    if(!aggregates.has(name)) aggregates.set(name,{name,count:0,patients:new Set()});
+    const entry = aggregates.get(name);
+    entry.count += 1;
+    const patientKey = patientKeyV2(item);
+    if(patientKey) entry.patients.add(patientKey);
+  }));
+  const rows = [...aggregates.values()]
+    .sort((a,b) => b.count-a.count || a.name.localeCompare(b.name,"ms-MY"))
+    .map(entry => `<tr><td>${esc(entry.name)}</td><td class="report-number">${entry.count}</td><td class="report-number">${entry.patients.size}</td><td class="report-number">${procedureTotal ? (entry.count/procedureTotal*100).toFixed(1) : "0.0"}%</td></tr>`).join("");
   return `<section class="report-preview" id="procedure-report-print">
-    <header class="report-print-header"><div><p>UNIT KECEMASAN & TRAUMA · HOSPITAL KUALA LIPIS</p><h2>Laporan Prosedur A.M.O</h2><span>${esc(range.label)} · ${esc(shiftLabel)}</span></div><img src="./prosedur-icon.png?v=2.6.0" alt=""></header>
-    <div class="report-summary"><div><strong>${cases.length}</strong><span>Jumlah pesakit</span></div><div><strong>${procedureTotal}</strong><span>Jumlah prosedur</span></div><div><strong>${minutesTotal}</strong><span>Jumlah minit</span></div></div>
-    ${rows ? `<div class="report-table-wrap"><table class="report-table"><thead><tr><th>Tarikh</th><th>Masa</th><th>Syif</th><th>Zone</th><th>ID Pesakit</th><th>Prosedur</th><th>Minit</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="report-empty">Tiada rekod untuk tempoh dan syif yang dipilih.</div>`}
-    <footer class="report-print-footer">Dijana pada ${esc(new Date().toLocaleString("ms-MY"))}</footer>
+    <header class="report-print-header"><div><p>UNIT KECEMASAN & TRAUMA · HOSPITAL KUALA LIPIS</p><h2>Laporan Ringkasan Prosedur A.M.O</h2><span>${esc(range.label)} · ${esc(shiftLabel)}</span></div><img src="./prosedur-icon.png?v=2.6.0" alt=""></header>
+    <div class="report-summary"><div><strong>${uniquePatientCountV2(cases)}</strong><span>Jumlah pesakit</span></div><div><strong>${procedureTotal}</strong><span>Jumlah prosedur</span></div><div><strong>${aggregates.size}</strong><span>Jenis prosedur</span></div></div>
+    ${rows ? `<div class="report-table-wrap"><table class="report-table"><thead><tr><th>Prosedur</th><th>Jumlah prosedur</th><th>Jumlah pesakit</th><th>Peratus</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="report-empty">Tiada rekod untuk tempoh dan syif yang dipilih.</div>`}
+    <footer class="report-print-footer">Tiada identiti pesakit dipaparkan · Dijana pada ${esc(new Date().toLocaleString("ms-MY"))}</footer>
   </section>`;
 }
 
@@ -1053,7 +1078,7 @@ function dailyRecordsHtml(todayCases, now){
           <span class="daily-record-id">${esc(String(patientId))}</span>
           <span class="daily-record-zone">${esc(zone ? zone.label : "Tiada Zone")}</span>
         </div>
-        <div class="daily-record-procedures">${item.procedures.map(proc => `<span class="daily-procedure-chip">${esc(proc.name)} <small>${esc(proc.durationLabel || (proc.minutes + " min"))}</small></span>`).join("")}</div>
+        <div class="daily-record-procedures">${item.procedures.map(proc => `<span class="daily-procedure-chip">${esc(proc.name)} <small>${esc(proc.durationLabel || (proc.minutes + " min"))}${proc.orderedBy ? `<br>Arahan daripada ${esc(proc.orderedBy)}` : ""}</small></span>`).join("")}</div>
       </article>`;
     }).join("") : `<div class="daily-shift-empty">Belum ada rekod untuk shift ${shift.label}.</div>`;
     return `<section class="daily-shift-section">
@@ -1075,6 +1100,8 @@ function dailyRecordsHtml(todayCases, now){
   const style = document.createElement("style");
   style.textContent = `
     .dashboard-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:5px;margin:-8px 0 22px;background:var(--chip);border:1px solid var(--border);border-radius:12px}
+    .dashboard-home-link{display:inline-flex;align-items:center;gap:4px;margin:-4px 0 14px;padding:7px 10px;border:1px solid var(--border);border-radius:9px;background:var(--panel);color:var(--muted2);font-size:12px;font-weight:700;text-decoration:none}
+    .doctor-field{margin-top:10px}.doctor-field .text-input{padding:10px 12px}.doctor-field .field-help{margin-top:4px}
     .dashboard-tab{padding:10px 8px;border-radius:8px;color:var(--muted2);font-size:14px;font-weight:600}
     .dashboard-tab.active{background:var(--panel);color:var(--accent);box-shadow:0 2px 8px rgba(28,36,32,.08)}
     .record-shift-filters{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:-10px 0 16px}
@@ -1244,12 +1271,26 @@ renderNewCase = function(){
   const patientId = state.registrationNumber.trim();
   const patientReady = patientId.length > 0;
   view.innerHTML = `<div class="nc-header"><button class="back-btn" onclick="state.step=2; renderView();"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button><div><div class="nc-step">Kes baru &middot; Langkah 3/3</div><div class="nc-title">Masukkan ID Pesakit</div></div></div><div class="active-shift-tag"><span class="dot" style="background:${activeShift.hex}; width:8px; height:8px;"></span><span>Shift ${activeShift.label} &middot; ${activeShift.time}</span></div><div class="active-shift-tag"><span class="dot" style="background:${activeZone.hex}; width:8px; height:8px;"></span><span>${activeZone.label}</span></div><div class="field-group"><div class="field-label">ID Pesakit</div><div class="empty-note" style="margin-bottom:10px; text-align:left; padding:12px 14px;">Masukkan ID Pesakit dahulu.</div><input class="text-input" value="${esc(state.registrationNumber)}" placeholder="Masukkan ID Pesakit, contoh: ID001" oninput="setRegistrationNumber(this.value)" autofocus></div>${patientReady ? "" : `<div id="patient-id-warning" class="sync-warn" style="margin-bottom:16px;"><span>Sila isi ID Pesakit dahulu sebelum pilih prosedur.</span></div>`}<div>${procedures.map(proc => { const name = proc.name; const isSelected = !!state.selectedProcs[name]; const safeId = name.replace(/[^a-zA-Z0-9]/g,"_"); const durId = selectedDurationId(name); const customMinutes = selectedCustomMinutes(name); const safeName = name.replace(/'/g,"\\'"); return `<div class="proc-card ${isSelected ? "selected" : ""}" id="card_${safeId}" style="${patientReady ? "" : "opacity:.45;"}"><button class="proc-card-btn" ${patientReady ? "" : "disabled"} onclick="toggleProcedure('${safeName}')"><span class="checkbox ${isSelected ? "checked" : ""}">${isSelected ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>` : ""}</span><span class="proc-name">${esc(name)}</span></button>${isSelected ? `<div class="dur-row">${DURATIONS.map(d => `<button class="dur-chip ${durId===d.id ? "selected" : ""}" onclick="setDuration('${safeName}','${d.id}')">${d.label}</button>`).join("")}</div><div class="field-group" style="margin-top:10px;"><div class="field-label">Custom tempoh prosedur</div><input class="text-input" type="number" min="1" inputmode="numeric" value="${esc(customMinutes)}" placeholder="Isi minit custom" oninput="setCustomDuration('${safeName}', this.value)"><div class="field-help">Isi jika tempoh selain pilihan masa tersedia.</div></div>` : ""}</div>`; }).join("")}</div><div class="save-bar"><button class="save-btn" id="save-btn" ${!patientReady || selectedCount===0 || state.saving ? "disabled" : ""} onclick="handleSaveCase()">Simpan kes ${selectedCount>0 ? `(${selectedCount} prosedur)` : ""}</button></div>`;
+  const doctorList = document.createElement("datalist");
+  doctorList.id = "doctor-suggestions";
+  doctorList.innerHTML = doctorSuggestions().map(name => `<option value="${esc(name)}"></option>`).join("");
+  view.appendChild(doctorList);
+  Object.keys(state.selectedProcs).forEach(name => {
+    const safeId = name.replace(/[^a-zA-Z0-9]/g,"_");
+    const card = document.getElementById(`card_${safeId}`);
+    if(!card) return;
+    const field = document.createElement("div");
+    field.className = "field-group doctor-field";
+    field.innerHTML = `<div class="field-label">Arahan daripada</div><input class="text-input" list="doctor-suggestions" value="${esc(durationState(name).orderedBy || "")}" placeholder="Contoh: Dr Amira"><div class="field-help">Nama baharu akan diingati sebagai cadangan.</div>`;
+    field.querySelector("input").addEventListener("input", event => setProcedureDoctor(name,event.target.value));
+    card.appendChild(field);
+  });
 };
 
 function durationState(name){
   const value = state.selectedProcs[name];
   if(value && typeof value === "object") return value;
-  return { durationId: value || defaultDurationIdForProcedure(name), customMinutes: "" };
+  return { durationId: value || defaultDurationIdForProcedure(name), customMinutes: "", orderedBy: "" };
 }
 
 function selectedDurationId(name){
@@ -1264,7 +1305,12 @@ function setCustomDuration(name, value){
   const allowed = new Set(visibleProceduresV2().map(proc => proc.name));
   if(!state.registrationNumber.trim()) { showToast("Sila isi ID Pesakit dahulu"); return; }
   if(!allowed.has(name)) return;
-  state.selectedProcs[name] = { durationId: "custom", customMinutes: String(value || "") };
+  state.selectedProcs[name] = { ...durationState(name), durationId: "custom", customMinutes: String(value || "") };
+}
+
+function setProcedureDoctor(name,value){
+  if(!state.selectedProcs[name]) return;
+  state.selectedProcs[name] = { ...durationState(name), orderedBy:String(value || "") };
 }
 
 selectShift = function(id){
@@ -1300,7 +1346,7 @@ toggleProcedure = function(name){
   if(!state.registrationNumber.trim()) { showToast("Sila isi ID Pesakit dahulu"); return; }
   if(!allowed.has(name)) return;
   if(state.selectedProcs[name]) delete state.selectedProcs[name];
-  else state.selectedProcs[name] = { durationId: defaultDurationIdForProcedure(name), customMinutes: "" };
+  else state.selectedProcs[name] = { durationId: defaultDurationIdForProcedure(name), customMinutes: "", orderedBy: "" };
   renderView();
 };
 
@@ -1308,7 +1354,7 @@ setDuration = function(name, durId){
   const allowed = new Set(visibleProceduresV2().map(proc => proc.name));
   if(!state.registrationNumber.trim()) { showToast("Sila isi ID Pesakit dahulu"); return; }
   if(!allowed.has(name)) return;
-  state.selectedProcs[name] = { durationId: durId, customMinutes: "" };
+  state.selectedProcs[name] = { ...durationState(name), durationId: durId, customMinutes: "" };
   renderView();
 };
 
@@ -1331,15 +1377,16 @@ handleSaveCase = function(){
       if(selected.durationId === "custom"){
         const minutes = Number(selected.customMinutes);
         if(!Number.isInteger(minutes) || minutes <= 0) throw new Error("Sila isi custom tempoh yang sah untuk " + name);
-        return { name, durationId: "custom", durationLabel: minutes + " min", minutes };
+        return { name, durationId: "custom", durationLabel: minutes + " min", minutes, orderedBy:String(selected.orderedBy || "").trim() };
       }
       const dur = DURATIONS.find(d => d.id === selected.durationId) || DURATIONS[0];
-      return { name, durationId: dur.id, durationLabel: dur.label, minutes: dur.minutes };
+      return { name, durationId: dur.id, durationLabel: dur.label, minutes: dur.minutes, orderedBy:String(selected.orderedBy || "").trim() };
     });
   }catch(err){
     showToast(err.message || "Custom tempoh tidak sah");
     return;
   }
+  rememberDoctors(procedures);
   const newCase = {
     id: `case_${now.getTime()}_${Math.random().toString(36).slice(2,7)}`,
     date: dateKeyForShift(now, state.selectedShift),
@@ -1362,6 +1409,21 @@ document.getElementById("dashboard-view").classList.remove("hidden");
 document.getElementById("fab").classList.remove("hidden");
 renderView();
 window.setTimeout(() => loadCases(), 0);
+let stopProcedureLive = null;
+if(window.AMOSubscribe){
+  stopProcedureLive = window.AMOSubscribe("procedure", records => {
+    const trend = visibleTrendDateKeys();
+    state.cases = records.filter(record => trend.has(normalizeDateKey(record.date))).map(record => ({
+      ...record,
+      date:normalizeDateKey(record.date),
+      registrationNumber:record.registrationNumber || record.patientId || "",
+      procedures:(record.procedures || []).map(proc => ({...proc,name:normalizeProcedureNameV2(proc.name),minutes:Number(proc.minutes)||0,durationLabel:proc.durationLabel || `${Number(proc.minutes)||0} min`,orderedBy:proc.orderedBy || ""}))
+    }));
+    writeCasesCache(state.cases); state.syncError = false;
+    if(state.view === "dashboard" && !state.reportLoading) renderDashboard();
+  }, error => { console.error("Firebase live procedure failed:",error); state.syncError = true; renderView(); });
+}
+window.addEventListener("beforeunload",()=>stopProcedureLive?.());
 </script>
 </body>
 </html>

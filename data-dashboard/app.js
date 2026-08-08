@@ -64,7 +64,7 @@ function valueOf(row, key) {
   if (typeof value?.toDate === "function") return displayTimestamp(value);
   if (Array.isArray(value)) return value.map(item => {
     if (typeof item !== "object" || item == null) return item;
-    if (item.name) return `${item.name}${item.status ? `: ${item.status}` : ""}${item.note ? ` (${item.note})` : ""}`;
+    if (item.name) return `${item.name}${item.status ? `: ${item.status}` : ""}${item.orderedBy ? ` · Arahan daripada ${item.orderedBy}` : ""}${item.note ? ` (${item.note})` : ""}`;
     return JSON.stringify(item);
   }).join(" · ");
   if (typeof value === "object") return JSON.stringify(value);
