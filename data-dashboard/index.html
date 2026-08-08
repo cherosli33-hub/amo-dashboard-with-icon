@@ -4,33 +4,56 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
-  <title>Dashboard Data Pusat · AMO Dashboard v2</title>
-  <link rel="stylesheet" href="./styles.css?v=2">
+  <title>Dashboard Penerima · AMO Dashboard v2</title>
+  <link rel="stylesheet" href="./styles.css?v=3">
 </head>
 <body>
   <header class="topbar">
-    <a href="../" aria-label="Kembali">←</a>
-    <div><small>AMO Dashboard v2</small><h1>Dashboard Data Pusat</h1></div>
-    <button id="logoutBtn" type="button">Log keluar</button>
+    <a href="../" aria-label="Kembali ke dashboard utama">←</a>
+    <div class="title-block">
+      <small>AMO Dashboard v2</small>
+      <h1>Dashboard Penerima</h1>
+    </div>
+    <div class="session">
+      <span id="userLabel"></span>
+      <button id="logoutBtn" type="button">Log keluar</button>
+    </div>
   </header>
   <main>
     <section id="gate" class="gate"><h2>Menyemak akses…</h2><p>Sesi Google yang sama digunakan untuk semua modul.</p></section>
     <div id="dashboard" hidden>
-      <section class="summary" id="summary" aria-label="Ringkasan modul"></section>
-      <section class="panel">
-        <div class="toolbar">
-          <nav id="tabs" aria-label="Modul data"></nav>
-          <div class="filters">
-            <input id="searchInput" type="search" placeholder="Cari dalam rekod">
-            <button id="refreshBtn" type="button">Muat semula</button>
-            <button id="csvBtn" type="button">Eksport CSV</button>
-          </div>
+      <section class="welcome">
+        <div>
+          <p class="eyebrow">PUSAT PENERIMAAN DATA</p>
+          <h2>Semua penghantaran dalam satu paparan</h2>
+          <p>Data Prosedur, Asma, PHC dan GIRN dipaparkan terus daripada Firebase.</p>
         </div>
-        <p id="status" role="status"></p>
+        <div class="live-card"><span class="live-dot"></span><div><strong>Data langsung</strong><small id="lastUpdated">Menunggu sambungan…</small></div></div>
+      </section>
+
+      <section class="summary" id="summary" aria-label="Ringkasan data"></section>
+
+      <section class="recent panel" aria-labelledby="recentTitle">
+        <div class="section-heading"><div><p class="eyebrow">TERKINI</p><h2 id="recentTitle">Aktiviti baru diterima</h2></div><small>Klik rekod untuk buka modul</small></div>
+        <div id="recentList" class="recent-list"><p class="empty">Menunggu data…</p></div>
+      </section>
+
+      <section class="panel data-panel">
+        <div class="toolbar">
+          <nav id="tabs" aria-label="Jenis data"></nav>
+          <button id="csvBtn" class="secondary" type="button">Eksport CSV</button>
+        </div>
+        <div class="filters" aria-label="Tapisan rekod">
+          <label class="search-field"><span>Cari</span><input id="searchInput" type="search" placeholder="Nama, ID, syif, status…"></label>
+          <label><span>Dari tarikh</span><input id="fromDate" type="date"></label>
+          <label><span>Hingga tarikh</span><input id="toDate" type="date"></label>
+          <button id="resetBtn" class="ghost" type="button">Kosongkan tapisan</button>
+        </div>
+        <div class="table-meta"><p id="status" role="status"></p><span id="connectionState">Menyambung…</span></div>
         <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
       </section>
     </div>
   </main>
-  <script type="module" src="./app.js?v=2"></script>
+  <script type="module" src="./app.js?v=3"></script>
 </body>
 </html>
