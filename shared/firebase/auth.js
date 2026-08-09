@@ -11,6 +11,9 @@ import {
 import { auth } from "./core.js";
 
 const googleProvider = new GoogleAuthProvider();
+// Sentiasa paparkan pemilih akaun supaya staf boleh bertukar antara akaun
+// Google peribadi dan akaun Google Workspace MOH pada peranti yang sama.
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export async function prepareAuth() {
   await setPersistence(auth, browserLocalPersistence);
