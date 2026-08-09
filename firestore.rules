@@ -2,12 +2,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function verifiedEmail(email) {
-      return signedIn() && request.auth.token.email_verified == true
-        && request.auth.token.email == email;
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.email_verified == true;
     }
-    function designatedAdmin() { return verifiedEmail('cherosli33@gmail.com'); }
-    function designatedSupervisor() { return verifiedEmail('yusseriharon6835@gmail.com'); }
+    function designatedAdmin() {
+      return verifiedEmail() && request.auth.token.email in [
+        'cherosli33@gmail.com',
+        'cherosli@moh.gov.my'
+      ];
+    }
+    function designatedSupervisor() {
+      return verifiedEmail() && request.auth.token.email in [
+        'mdrafi@moh.gov.my',
+        'yusseriharon6835@gmail.com'
+      ];
+    }
     function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
     function staff() { return signedIn() && profile().active == true && profile().role in ['supervisor', 'admin']; }
     function admin() { return signedIn() && profile().active == true && profile().role == 'admin'; }
@@ -33,11 +42,40 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    match /{collectionName}/{documentId} {
-      allow read, create, update: if signedIn() && collectionName in [
-        'procedure_cases', 'asthma_assessments', 'phc_inspections', 'phc_findings',
-        'girn_inspections', 'girn_findings'
-      ];
+    // Rekod operasi: pengguna biasa menggunakan Firebase Anonymous Auth di belakang tabir.
+    match /procedure_cases/{documentId} {
+      allow read, create, update: if signedIn();
+      allow delete: if false;
+    }
+    match /asthma_assessments/{documentId} {
+      allow read, create, update: if signedIn();
+      allow delete: if false;
+    }
+    match /phc_inspections/{documentId} {
+      allow read, create, update: if signedIn();
+      allow delete: if false;
+    }
+    match /girn_inspections/{documentId} {
+      allow read, create, update: if signedIn();
+      allow delete: if false;
+    }
+
+    // Penemuan boleh dihantar oleh app biasa, tetapi tindakan/kemas kini hanya oleh penyelia/admin.
+    match /phc_findings/{documentId} {
+      allow read, create: if signedIn();
+      allow update: if staff();
+      allow delete: if false;
+    }
+    match /girn_findings/{documentId} {
+      allow read, create: if signedIn();
+      allow update: if staff();
+      allow delete: if false;
+    }
+
+    // Saluran umum untuk notifikasi/tindakan penyelia daripada mana-mana modul.
+    match /supervisor_actions/{documentId} {
+      allow create: if signedIn();
+      allow read, update: if staff();
       allow delete: if false;
     }
   }
