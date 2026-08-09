@@ -23,10 +23,22 @@
     }
     return nativeFetch(input, init);
   };
-  if (location.pathname.startsWith("/girn")) {
+
+  function loadEnhancement(src) {
     const script = document.createElement("script");
     script.type = "module";
-    script.src = "/girn/girn-enhancements.js?v=1";
+    script.src = src;
     document.head.appendChild(script);
+  }
+
+  const path = location.pathname;
+  if (path.endsWith("/amo.html") || path.endsWith("amo.html")) {
+    loadEnhancement(new URL("../../amo-procedure-enhancements.js?v=1", document.currentScript.src).href);
+  }
+  if (path.endsWith("/asthma.html") || path.endsWith("asthma.html")) {
+    loadEnhancement(new URL("../../asthma-enhancements.js?v=1", document.currentScript.src).href);
+  }
+  if (path.includes("/girn")) {
+    loadEnhancement(new URL("../../girn/girn-enhancements.js?v=2", document.currentScript.src).href);
   }
 })();
