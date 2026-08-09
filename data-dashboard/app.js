@@ -1,8 +1,9 @@
-import { collection, limit, onSnapshot, query } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { collection, doc, limit, onSnapshot, query, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import { auth, db } from "../shared/firebase/core.js";
 import { logout, prepareAuth } from "../shared/firebase/auth.js";
 import { getProfile, isSupervisor } from "../shared/firebase/users.js";
+import { COLLECTIONS } from "../shared/firebase/database.js";
 import procedure from "./modules/procedure.js";
 import asthma from "./modules/asthma.js";
 import phc from "./modules/phc.js";
@@ -12,7 +13,10 @@ import girnFindings from "./modules/girn-findings.js";
 
 const primaryModules = [procedure, asthma, phc, girn];
 const modules = [...primaryModules, phcFindings, girnFindings];
-const state = { active: procedure, data: new Map(), ready: new Set(), errors: new Set(), stops: [] };
+const actionTaskModule = { id:"supervisor-actions", label:"Tindakan Umum", shortLabel:"UMUM", collection:COLLECTIONS.actionTasks, finding:true };
+const streams = [...modules, actionTaskModule];
+const actionSources = [phcFindings, girnFindings, actionTaskModule];
+const state = { active: procedure, data: new Map(), ready: new Set(), errors: new Set(), stops: [], selectedActions:new Set(), acting:false };
 const number = new Intl.NumberFormat("ms-MY");
 const gate = document.querySelector("#gate");
 const dashboard = document.querySelector("#dashboard");
@@ -27,10 +31,18 @@ const recentList = document.querySelector("#recentList");
 const search = document.querySelector("#searchInput");
 const fromDate = document.querySelector("#fromDate");
 const toDate = document.querySelector("#toDate");
+const actionList = document.querySelector("#actionList");
+const actionCount = document.querySelector("#actionCount");
+const actionStatus = document.querySelector("#actionStatus");
+const selectAllActions = document.querySelector("#selectAllActions");
+const ackSelectedBtn = document.querySelector("#ackSelectedBtn");
+const verifySelectedBtn = document.querySelector("#verifySelectedBtn");
+let sessionUser = null;
+let sessionProfile = null;
 
 function escapeHtml(value) {
   const node = document.createElement("div");
-  node.textContent = String(value);
+  node.textContent = String(value ?? "");
   return node.innerHTML;
 }
 
@@ -43,13 +55,13 @@ function dateObject(value) {
 
 function recordDate(row) {
   if (/^\d{4}-\d{2}-\d{2}/.test(String(row.date || ""))) return String(row.date).slice(0, 10);
-  const value = row.submittedAt || row.timestamp || row.savedAt || row.createdAt || row.reportedAt;
+  const value = row.submittedAt || row.timestamp || row.savedAt || row.createdAt || row.reportedAt || row.actionAt;
   const parsed = dateObject(value);
-  return parsed ? parsed.toISOString().slice(0, 10) : "";
+  return parsed ? parsed.toLocaleDateString("sv-SE", { timeZone:"Asia/Kuala_Lumpur" }) : "";
 }
 
 function recordTime(row) {
-  const value = row.submittedAt || row.timestamp || row.savedAt || row.createdAt || row.reportedAt || (row.date ? `${row.date}T${row.time || "00:00"}:00+08:00` : "");
+  const value = row.submittedAt || row.timestamp || row.savedAt || row.createdAt || row.reportedAt || row.actionAt || (row.date ? `${row.date}T${row.time || "00:00"}:00+08:00` : "");
   return dateObject(value)?.getTime() || 0;
 }
 
@@ -69,7 +81,7 @@ function valueOf(row, key) {
   }).join(" · ");
   if (typeof value === "object") return JSON.stringify(value);
   if (typeof value === "boolean") return value ? "Ya" : "Tidak";
-  if (["submittedAt", "savedAt", "timestamp", "reportedAt", "actionAt", "verifiedAt"].includes(key)) return displayTimestamp(value);
+  if (["submittedAt", "savedAt", "timestamp", "reportedAt", "actionAt", "verifiedAt", "acknowledgedAt", "completedAt"].includes(key)) return displayTimestamp(value);
   return value;
 }
 
@@ -99,19 +111,131 @@ function renderTable() {
   status.textContent = `${number.format(rows.length)}${filterNote} rekod ${state.active.label}${rows.length > 1000 ? " · 1,000 baris pertama dipaparkan" : ""}`;
 }
 
-function outstanding(module) {
-  return rowsFor(module).filter(row => !["selesai", "telah diambil tindakan", "ditutup"].includes(String(row.state || row.status || "").toLocaleLowerCase("ms-MY"))).length;
+function normalizedStatus(row) {
+  return String(row.actionStatus || row.state || row.status || "").trim().toLocaleLowerCase("ms-MY");
+}
+
+function isOutstanding(row) {
+  const done = new Set(["selesai", "telah diambil tindakan", "ditutup", "diambil maklum", "disahkan", "completed", "closed", "acknowledged", "verified"]);
+  return !done.has(normalizedStatus(row));
+}
+
+function actionKey(module, row) { return `${module.id}:${row.id}`; }
+
+function actionItems() {
+  return actionSources.flatMap(module => rowsFor(module)
+    .filter(isOutstanding)
+    .map(row => ({ module, row, key:actionKey(module, row), time:recordTime(row) })))
+    .sort((a, b) => b.time - a.time);
 }
 
 function renderSummary() {
   const primaryTotal = primaryModules.reduce((sum, module) => sum + rowsFor(module).length, 0);
+  const pendingActions = actionItems().length;
   const metrics = [
     { label:"Jumlah diterima", value:primaryTotal, className:"total" },
     ...primaryModules.map(module => ({ label:module.label, value:rowsFor(module).length })),
-    { label:"Tindakan PHC", value:outstanding(phcFindings), className:"alert" },
-    { label:"Tindakan GIRN", value:outstanding(girnFindings), className:"alert" }
+    { label:"Perlu tindakan", value:pendingActions, className:"alert" },
+    { label:"Penemuan", value:rowsFor(phcFindings).length + rowsFor(girnFindings).length }
   ];
   summary.innerHTML = metrics.map(item => `<article class="metric ${item.className || ""}"><small>${escapeHtml(item.label)}</small><strong>${number.format(item.value)}</strong></article>`).join("");
+}
+
+function actionTitleFor(module, row) {
+  if (module.id === "phc-findings") return row.item || row.type || "Penemuan PHC";
+  if (module.id === "girn-findings") return row.device || row.inspectionStatus || "Penemuan GIRN";
+  return row.title || row.subject || row.type || "Tindakan penyelia";
+}
+
+function actionDetailFor(module, row) {
+  if (module.id === "phc-findings") return [row.date, row.bagShift, row.type, row.note].filter(Boolean).join(" · ");
+  if (module.id === "girn-findings") return [row.date, row.shift, row.inspectionStatus, row.note, row.reporter].filter(Boolean).join(" · ");
+  return [recordDate(row), row.module, row.message || row.detail || row.note, row.reporter || row.createdBy].filter(Boolean).join(" · ");
+}
+
+function actionBadgeFor(module, row) {
+  const required = row.requiredAction || row.actionType;
+  if (required) return required;
+  if (module.id === "phc-findings") return "PHC · Perlu tindakan";
+  if (module.id === "girn-findings") return "GIRN · Perlu tindakan";
+  return "Perlu tindakan";
+}
+
+function renderActions() {
+  const items = actionItems();
+  const existing = new Set(items.map(item => item.key));
+  [...state.selectedActions].forEach(key => { if (!existing.has(key)) state.selectedActions.delete(key); });
+  actionCount.textContent = number.format(items.length);
+  actionList.innerHTML = items.length ? items.map(({ module, row, key }) => `
+    <label class="action-item ${state.selectedActions.has(key) ? "selected" : ""}">
+      <span class="action-check"><input type="checkbox" data-action-key="${escapeHtml(key)}" ${state.selectedActions.has(key) ? "checked" : ""}></span>
+      <span class="action-copy"><strong>${escapeHtml(actionTitleFor(module, row))}</strong><span>${escapeHtml(actionDetailFor(module, row) || "Tiada catatan tambahan")}</span></span>
+      <span class="action-badge">${escapeHtml(actionBadgeFor(module, row))}</span>
+    </label>`).join("") : `<div class="action-empty">✓ Tiada tindakan penyelia yang tertunggak.</div>`;
+
+  actionList.querySelectorAll("[data-action-key]").forEach(input => input.addEventListener("change", () => {
+    if (input.checked) state.selectedActions.add(input.dataset.actionKey);
+    else state.selectedActions.delete(input.dataset.actionKey);
+    renderActions();
+  }));
+
+  const selectedCount = state.selectedActions.size;
+  ackSelectedBtn.disabled = state.acting || selectedCount === 0;
+  verifySelectedBtn.disabled = state.acting || selectedCount === 0;
+  const allSelected = items.length > 0 && items.every(item => state.selectedActions.has(item.key));
+  selectAllActions.checked = allSelected;
+  selectAllActions.indeterminate = !allSelected && selectedCount > 0;
+  selectAllActions.disabled = state.acting || items.length === 0;
+}
+
+function selectedActionItems() {
+  const selected = state.selectedActions;
+  return actionItems().filter(item => selected.has(item.key));
+}
+
+function actorName() {
+  return sessionProfile?.name || sessionUser?.displayName || sessionUser?.email || "Penyelia";
+}
+
+function changesForAction(module, mode) {
+  const actor = actorName();
+  const email = sessionUser?.email || sessionProfile?.email || "";
+  const label = mode === "verify" ? "Disahkan" : "Diambil maklum";
+  const common = { action:label, actionBy:actor, actionByEmail:email, actionAt:serverTimestamp() };
+  if (module.id === "phc-findings") {
+    return mode === "verify"
+      ? { ...common, status:"Selesai", verifiedBy:actor, verifiedByEmail:email, verifiedAt:serverTimestamp() }
+      : { ...common, status:"Selesai", acknowledgedBy:actor, acknowledgedByEmail:email, acknowledgedAt:serverTimestamp() };
+  }
+  if (module.id === "girn-findings") {
+    return mode === "verify"
+      ? { ...common, state:"Selesai", verifiedBy:actor, verifiedByEmail:email, verifiedAt:serverTimestamp() }
+      : { ...common, state:"Diambil maklum", acknowledgedBy:actor, acknowledgedByEmail:email, acknowledgedAt:serverTimestamp() };
+  }
+  return { ...common, status:"selesai", state:"selesai", completedBy:actor, completedByEmail:email, completedAt:serverTimestamp() };
+}
+
+async function runSelectedAction(mode) {
+  const items = selectedActionItems();
+  if (!items.length || state.acting) return;
+  const verb = mode === "verify" ? "sahkan" : "ambil maklum";
+  if (!confirm(`${verb === "sahkan" ? "Sahkan" : "Ambil maklum"} ${items.length} rekod terpilih?`)) return;
+  state.acting = true;
+  actionStatus.textContent = `Menyimpan tindakan untuk ${items.length} rekod…`;
+  renderActions();
+  try {
+    const batch = writeBatch(db);
+    items.forEach(({ module, row }) => batch.update(doc(db, module.collection, row.id), changesForAction(module, mode)));
+    await batch.commit();
+    state.selectedActions.clear();
+    actionStatus.textContent = `${items.length} rekod berjaya ${verb === "sahkan" ? "disahkan" : "diambil maklum"} oleh ${actorName()}.`;
+  } catch (error) {
+    console.error("Tindakan penyelia gagal", error);
+    actionStatus.textContent = error.message || "Tindakan gagal disimpan.";
+  } finally {
+    state.acting = false;
+    renderActions();
+  }
 }
 
 function recentText(module, row) {
@@ -136,8 +260,8 @@ function renderConnection() {
   if (state.errors.size) {
     connectionState.textContent = `${state.errors.size} aliran gagal disambung`;
     connectionState.className = "error";
-  } else if (state.ready.size < modules.length) {
-    connectionState.textContent = `Menyambung ${state.ready.size}/${modules.length} aliran…`;
+  } else if (state.ready.size < streams.length) {
+    connectionState.textContent = `Menyambung ${state.ready.size}/${streams.length} aliran…`;
     connectionState.className = "";
   } else {
     connectionState.textContent = "● Semua data langsung";
@@ -147,6 +271,7 @@ function renderConnection() {
 
 function renderAll() {
   renderSummary();
+  renderActions();
   renderRecent();
   renderTable();
   renderConnection();
@@ -162,7 +287,7 @@ function selectModule(module) {
 }
 
 function startLiveData() {
-  modules.forEach(module => {
+  streams.forEach(module => {
     const stop = onSnapshot(query(collection(db, module.collection), limit(5000)), snapshot => {
       const rows = snapshot.docs.map(item => ({ id:item.id, ...item.data() })).sort((a, b) => recordTime(b) - recordTime(a));
       state.data.set(module.id, rows);
@@ -202,6 +327,14 @@ modules.forEach(module => {
 document.querySelector("#resetBtn").addEventListener("click", () => { search.value = ""; fromDate.value = ""; toDate.value = ""; renderTable(); });
 document.querySelector("#csvBtn").addEventListener("click", exportCsv);
 document.querySelector("#logoutBtn").addEventListener("click", async () => { state.stops.forEach(stop => stop()); await logout(); location.href = "../"; });
+selectAllActions.addEventListener("change", () => {
+  const items = actionItems();
+  if (selectAllActions.checked) items.forEach(item => state.selectedActions.add(item.key));
+  else state.selectedActions.clear();
+  renderActions();
+});
+ackSelectedBtn.addEventListener("click", () => runSelectedAction("acknowledge"));
+verifySelectedBtn.addEventListener("click", () => runSelectedAction("verify"));
 window.addEventListener("beforeunload", () => state.stops.forEach(stop => stop()));
 
 await prepareAuth();
@@ -210,6 +343,8 @@ const profile = user && !user.isAnonymous ? await getProfile(user.uid).catch(() 
 if (!user || user.isAnonymous || !isSupervisor(profile)) {
   gate.innerHTML = `<h2>Akses tidak dibenarkan</h2><p>Log masuk di dashboard utama menggunakan akaun admin atau penyelia yang diluluskan.</p><a href="../">Kembali ke dashboard utama</a>`;
 } else {
+  sessionUser = user;
+  sessionProfile = profile;
   document.querySelector("#userLabel").textContent = `${profile.name || user.displayName || user.email} · ${profile.role === "admin" ? "Admin" : "Penyelia"}`;
   gate.hidden = true;
   dashboard.hidden = false;
