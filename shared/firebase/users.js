@@ -16,8 +16,12 @@ export const ROLES = Object.freeze({
   ADMIN: "admin"
 });
 
+// Senarai akaun yang terus diluluskan apabila berjaya Sign in with Google.
+// Email dinormalisasi kepada huruf kecil oleh assignedRole().
 export const STAFF_ACCESS = Object.freeze({
   "cherosli33@gmail.com": ROLES.ADMIN,
+  "cherosli@moh.gov.my": ROLES.ADMIN,
+  "mdrafi@moh.gov.my": ROLES.SUPERVISOR,
   "yusseriharon6835@gmail.com": ROLES.SUPERVISOR
 });
 
@@ -32,8 +36,8 @@ export async function getProfile(uid) {
   return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
 }
 
-// Dipanggil selepas login. Kali pertama: cipta profil dengan role "ppp".
-// Kali seterusnya: kemas kini lastLoginAt sahaja. TIDAK menimpa role sedia ada.
+// Dipanggil selepas login. Kali pertama: cipta profil pending jika tidak tersenarai.
+// Kali seterusnya: kemas kini lastLoginAt sahaja. Role yang diluluskan akan diselaraskan.
 export async function ensureProfile(user) {
   if (!user?.uid) throw new Error("Pengguna tidak sah.");
   const ref = doc(db, COLLECTIONS.users, user.uid);
