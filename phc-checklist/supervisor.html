@@ -1,10 +1,26 @@
 <!doctype html>
 <html lang="ms">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#071d36">
-  <link rel="manifest" href="manifest.json"><link rel="icon" href="assets/icon192.png"><link rel="stylesheet" href="css/style.css?v=2.7.0">
-  <title>Semakan Penyelia — PHC Checklist</title>
-  <script src="../shared/firebase/bootstrap.js?v=2"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#071d36">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/icon192.png">
+  <link rel="stylesheet" href="css/style.css?v=2.7.0">
+  <title>Dashboard Penerima — PHC Checklist</title>
+  <meta http-equiv="refresh" content="0; url=../data-dashboard/">
 </head>
-<body data-page="supervisor"><div class="app-shell"><header class="topbar supervisor-topbar"><a class="icon-button" href="settings.html" aria-label="Kembali">←</a><div class="topbar-title"><small>AKSES TERHAD</small><strong>Semakan Penyelia</strong></div><span class="setting-icon shield">♜</span></header><main class="page supervisor-page" id="supervisorRoot"><section class="card empty-state"><span>↻</span><h3>Menyediakan log masuk</h3><p>Sila tunggu sebentar.</p></section></main></div><div class="modal-backdrop" id="supervisorModal" hidden></div><script type="module" src="js/supervisor.js?v=2.7.0"></script></body>
+<body data-page="supervisor">
+  <div class="app-shell">
+    <main class="page supervisor-page">
+      <section class="card empty-state">
+        <span>↗</span>
+        <h3>Tindakan penyelia telah dipusatkan</h3>
+        <p>Pengesahan dan ambil maklum PHC kini dibuat di Dashboard Penerima.</p>
+        <p><a class="button primary full" href="../data-dashboard/">Buka Dashboard Penerima</a></p>
+      </section>
+    </main>
+  </div>
+  <script>location.replace('../data-dashboard/');</script>
+</body>
 </html>
