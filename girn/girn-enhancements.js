@@ -1,5 +1,5 @@
 const style=document.createElement("style");
-style.textContent=`.amo-bulk-ack{margin-left:8px;padding:9px 13px;border:0;border-radius:9px;background:#0b7568;color:#fff;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.amo-bulk-ack:disabled{opacity:.55}.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}.amo-bulk-ack{width:100%;margin:8px 0 0}}`;
+style.textContent=`.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}}`;
 document.head.appendChild(style);
 if(!document.body) await new Promise(resolve=>document.addEventListener("DOMContentLoaded",resolve,{once:true}));
 
@@ -34,34 +34,11 @@ async function addWeeklyAudit(){
   }catch(error){ panel.querySelector("p").textContent=error.message||"Data mingguan gagal dimuatkan."; }
 }
 
-async function acknowledgeAll(button){
-  const officer=prompt("Masukkan nama pegawai yang mengambil maklum semua penemuan:");
-  if(!officer?.trim()) return;
-  const data=await readDashboard();
-  const open=(data.findings||[]).filter(item=>item.state==="Baharu");
-  if(!open.length){ alert("Tiada penemuan baharu."); return; }
-  if(!confirm(`Tandakan ${open.length} penemuan sebagai telah diambil maklum oleh ${officer.trim()}?`)) return;
-  button.disabled=true; button.textContent="Menyimpan…";
-  const stamp=new Date().toISOString();
-  try{
-    for(const finding of open){
-      await window.AMOFirebaseRequest({module:"girn",action:"updateFinding",body:{action:"updateFinding",finding:{...finding,state:"Diambil maklum",acknowledgedBy:officer.trim(),acknowledgedAt:stamp}}});
-    }
-    location.reload();
-  }catch(error){ alert(error.message||"Tindakan pukal gagal disimpan."); button.disabled=false; button.textContent="✓ Semua telah diambil maklum"; }
-}
-
-function addBulkAction(){
-  const heading=[...document.querySelectorAll("h3")].find(node=>node.textContent.includes("Susulan penemuan"));
-  const area=heading?.closest(".intro-row");
-  if(!area||area.querySelector(".amo-bulk-ack")) return;
-  const button=document.createElement("button"); button.type="button"; button.className="amo-bulk-ack"; button.textContent="✓ Semua telah diambil maklum";
-  button.addEventListener("click",()=>acknowledgeAll(button)); area.appendChild(button);
-}
-
-const observer=new MutationObserver(()=>{ addBulkAction(); void addWeeklyAudit(); });
+// Tindakan penyelia sengaja tidak lagi dibuat dalam app GIRN.
+// Penemuan hanya dipaparkan di sini; pengesahan / ambil maklum dibuat di Dashboard Penerima.
+const observer=new MutationObserver(()=>{ void addWeeklyAudit(); });
 observer.observe(document.body,{childList:true,subtree:true});
-addBulkAction(); void addWeeklyAudit();
+void addWeeklyAudit();
 
 let initialStreams=0;
 let reloadTimer=null;
