@@ -9,3 +9,12 @@
 
 /*.html
   Cache-Control: no-cache
+
+/data-dashboard/*
+  Cache-Control: no-cache
+
+/shared/firebase/bootstrap.js
+  Cache-Control: no-cache
+
+/girn/girn-enhancements.js
+  Cache-Control: no-cache

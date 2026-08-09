@@ -39,6 +39,6 @@
     loadEnhancement(new URL("../../asthma-enhancements.js?v=2", document.currentScript.src).href);
   }
   if (path.includes("/girn")) {
-    loadEnhancement(new URL("../../girn/girn-enhancements.js?v=2", document.currentScript.src).href);
+    loadEnhancement(new URL("../../girn/girn-enhancements.js?v=3", document.currentScript.src).href);
   }
 })();

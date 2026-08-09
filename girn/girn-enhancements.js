@@ -72,3 +72,21 @@ function liveChanged(){
 }
 const stops=[window.AMOSubscribe?.("girn",liveChanged,console.error),window.AMOSubscribe?.("girnFindings",liveChanged,console.error)].filter(Boolean);
 window.addEventListener("beforeunload",()=>{observer.disconnect();stops.forEach(stop=>stop());});
+
+function fastPrint(){
+  document.documentElement.classList.add("print-preparing");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    window.print();
+    document.documentElement.classList.remove("print-preparing");
+  }));
+}
+
+// Pintasan cetak disediakan selepas paparan semasa sempat dicat, supaya dialog
+// sistem tidak tersekat oleh kemas kini React dan pengiraan audit pada klik sama.
+document.addEventListener("click",event=>{
+  const button=event.target.closest?.("button");
+  if(!button||!/cetak laporan/i.test(button.textContent||"")) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  fastPrint();
+},true);

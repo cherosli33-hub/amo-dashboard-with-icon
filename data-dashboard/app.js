@@ -24,19 +24,18 @@ const shiftDefinitions = [
   { id:"evening", label:"Petang", aliases:["evening", "afternoon", "petang"] },
   { id:"night", label:"Malam", aliases:["night", "malam"] }
 ];
-const state = { active:procedure, data:new Map(), ready:new Set(), errors:new Set(), stops:[], selectedActions:new Set(), acting:false };
+const state = { active:procedure, data:new Map(), ready:new Set(), errors:new Set(), stops:[], selectedActions:new Set(), acting:false, reportHtml:"", reportMonth:"", reportDirty:true };
 const number = new Intl.NumberFormat("ms-MY");
 const gate = document.querySelector("#gate");
 const dashboard = document.querySelector("#dashboard");
 const tabs = document.querySelector("#tabs");
-const tableHead = document.querySelector("#tableHead");
-const tableBody = document.querySelector("#tableBody");
 const status = document.querySelector("#status");
 const connectionState = document.querySelector("#connectionState");
 const lastUpdated = document.querySelector("#lastUpdated");
-const search = document.querySelector("#searchInput");
-const fromDate = document.querySelector("#fromDate");
-const toDate = document.querySelector("#toDate");
+const reportMonth = document.querySelector("#reportMonth");
+const reportPreview = document.querySelector("#monthlyReportPreview");
+const generateReportBtn = document.querySelector("#generateReportBtn");
+const printPreviewBtn = document.querySelector("#printPreviewBtn");
 const actionList = document.querySelector("#actionList");
 const actionCount = document.querySelector("#actionCount");
 const actionStatus = document.querySelector("#actionStatus");
@@ -47,6 +46,7 @@ const verifyPhcDayBtn = document.querySelector("#verifyPhcDayBtn");
 const printDialog = document.querySelector("#printDialog");
 let sessionUser = null;
 let sessionProfile = null;
+const adminEmails = new Set(["cherosli33@gmail.com", "cherosli@moh.gov.my"]);
 
 function escapeHtml(value) {
   const node = document.createElement("div");
@@ -82,6 +82,14 @@ function displayTimestamp(value) {
   return parsed ? parsed.toLocaleString("ms-MY", { dateStyle:"medium", timeStyle:"short", timeZone:"Asia/Kuala_Lumpur" }) : value;
 }
 
+function sessionEmail() {
+  return String(sessionUser?.email || sessionProfile?.email || "").trim().toLowerCase();
+}
+
+function roleLabel() {
+  return sessionProfile?.role === "admin" || adminEmails.has(sessionEmail()) ? "Admin" : "Penyelia";
+}
+
 function valueOf(row, key) {
   const value = row[key];
   if (value == null) return "";
@@ -108,28 +116,6 @@ function isOutstanding(module, row) {
   return !done.has(normalizedStatus(row));
 }
 
-function filteredRows() {
-  const term = search.value.trim().toLocaleLowerCase("ms-MY");
-  const from = fromDate.value;
-  const to = toDate.value;
-  return rowsFor(state.active).filter(row => {
-    const date = recordDate(row);
-    if (from && (!date || date < from)) return false;
-    if (to && (!date || date > to)) return false;
-    return !term || JSON.stringify(row, (_key, value) => typeof value?.toDate === "function" ? value.toDate().toISOString() : value).toLocaleLowerCase("ms-MY").includes(term);
-  });
-}
-
-function renderTable() {
-  const rows = filteredRows();
-  tableHead.innerHTML = `<tr>${state.active.columns.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join("")}</tr>`;
-  tableBody.innerHTML = rows.length
-    ? rows.slice(0, 1000).map(row => `<tr>${state.active.columns.map(([key]) => `<td class="${["procedures", "devices", "notes", "note", "action"].includes(key) ? "long" : ""}">${escapeHtml(valueOf(row, key))}</td>`).join("")}</tr>`).join("")
-    : `<tr class="no-results"><td colspan="${state.active.columns.length}">Tiada rekod sepadan dengan tapisan.</td></tr>`;
-  const filterNote = search.value || fromDate.value || toDate.value ? ` daripada ${number.format(rowsFor(state.active).length)}` : "";
-  status.textContent = `${number.format(rows.length)}${filterNote} rekod ${state.active.label}${rows.length > 1000 ? " · 1,000 baris pertama dipaparkan" : ""}`;
-}
-
 function shiftId(value) {
   const normalized = String(value || "").trim().toLocaleLowerCase("ms-MY");
   return shiftDefinitions.find(shift => shift.aliases.some(alias => normalized.includes(alias)))?.id || "";
@@ -148,7 +134,7 @@ function renderHero() {
   const now = new Date();
   const currentHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", hourCycle:"h23" }).format(now));
   const activeShift = currentHour >= 22 || currentHour < 7 ? "Malam" : currentHour < 15 ? "Pagi" : "Petang";
-  document.querySelector("#todayContext").textContent = `${now.toLocaleDateString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", weekday:"long", day:"numeric", month:"long", year:"numeric" })} · Syif ${activeShift} · ${sessionProfile?.name || "Penyelia"}`;
+  document.querySelector("#todayContext").textContent = `${now.toLocaleDateString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", weekday:"long", day:"numeric", month:"long", year:"numeric" })} · Syif ${activeShift} · ${roleLabel()}`;
   const issues = issueCounts();
   const total = Object.values(issues).reduce((sum, list) => sum + list.length, 0);
   const critical = issues.severeAsthma.length + issues.girnIssues.filter(row => /kritikal|critical|tidak berfungsi|rosak/i.test(`${row.inspectionStatus} ${row.state} ${row.note}`)).length;
@@ -186,7 +172,11 @@ function renderAttention() {
   const items = attentionItems();
   document.querySelector("#attentionCount").textContent = number.format(items.reduce((sum, item) => sum + Number(item.title.match(/\d+/)?.[0] || 0), 0));
   document.querySelector("#attentionList").innerHTML = items.length ? items.map(item => `<button class="attention-item ${item.tone}" type="button" data-attention-module="${item.module.id}"><span>${item.icon}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></span><b>›</b></button>`).join("") : `<div class="all-clear"><span>✓</span><div><strong>Tiada tindakan diperlukan sekarang</strong><small>Semua aliran yang diterima berada dalam keadaan baik.</small></div></div>`;
-  document.querySelectorAll("[data-attention-module]").forEach(button => button.addEventListener("click", () => selectModule(modules.find(module => module.id === button.dataset.attentionModule) || procedure)));
+  document.querySelectorAll("[data-attention-module]").forEach(button => button.addEventListener("click", () => {
+    const module = modules.find(item => item.id === button.dataset.attentionModule);
+    if (primaryModules.includes(module)) selectModule(module);
+    else document.querySelector("#supervisorCentre").scrollIntoView({ behavior:"smooth", block:"start" });
+  }));
 }
 
 function renderShifts() {
@@ -214,24 +204,6 @@ function renderRecent() {
     return `<button class="timeline-item" type="button" data-module="${module.id}"><time>${escapeHtml(time)}</time><span class="timeline-dot ${module.id}"></span><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml([module.label, detail].filter(Boolean).join(" · "))}</small></span></button>`;
   }).join("") : `<p class="empty">Belum ada aktiviti diterima hari ini.</p>`;
   document.querySelectorAll("[data-module]").forEach(button => button.addEventListener("click", () => selectModule(modules.find(module => module.id === button.dataset.module))));
-}
-
-function lastSevenDays() {
-  return Array.from({ length:7 }, (_, index) => {
-    const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() - (6 - index));
-    return { key:localDateKey(date), short:date.toLocaleDateString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", weekday:"short" }) };
-  });
-}
-
-function renderWeekTrend() {
-  const days = lastSevenDays();
-  const totals = days.map(day => primaryModules.reduce((sum, module) => sum + rowsFor(module).filter(row => recordDate(row) === day.key).length, 0));
-  const maximum = Math.max(1, ...totals);
-  document.querySelector("#weekSummary").innerHTML = primaryModules.map(module => {
-    const total = rowsFor(module).filter(row => days.some(day => day.key === recordDate(row))).length;
-    return `<div><span>${module.label}</span><strong>${number.format(total)}</strong></div>`;
-  }).join("");
-  document.querySelector("#weekTrend").innerHTML = days.map((day, index) => `<div class="trend-day"><span class="trend-value">${number.format(totals[index])}</span><i style="--height:${Math.max(7, Math.round((totals[index] / maximum) * 100))}%"></i><small>${escapeHtml(day.short)}</small></div>`).join("");
 }
 
 function actionKey(module, row) { return `${module.id}:${row.id}`; }
@@ -358,15 +330,19 @@ function renderConnection() {
 }
 
 function renderAll() {
-  renderHero(); renderModuleCards(); renderAttention(); renderShifts(); renderRecent(); renderWeekTrend(); renderActions(); renderTable(); renderConnection();
+  renderHero(); renderModuleCards(); renderAttention(); renderShifts(); renderRecent(); renderActions(); renderConnection();
   lastUpdated.textContent = `Dikemas kini ${new Date().toLocaleTimeString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", minute:"2-digit", second:"2-digit" })}`;
 }
 
 function selectModule(module) {
-  if (!module?.columns) return;
+  if (!primaryModules.includes(module)) return;
   state.active = module;
   [...tabs.children].forEach(button => button.classList.toggle("active", button.dataset.id === module.id));
-  renderTable();
+  state.reportHtml = "";
+  state.reportDirty = true;
+  reportPreview.innerHTML = `<p class="empty">Tekan <strong>Jana laporan bulanan</strong> untuk melihat ringkasan ${escapeHtml(module.label)}.</p>`;
+  status.textContent = `Laporan ${module.label} belum dijana.`;
+  printPreviewBtn.disabled = true;
   document.querySelector(".data-panel").scrollIntoView({ behavior:"smooth", block:"start" });
 }
 
@@ -374,41 +350,141 @@ function startLiveData() {
   streams.forEach(module => {
     const stop = onSnapshot(query(collection(db, module.collection), limit(5000)), snapshot => {
       const rows = snapshot.docs.map(item => ({ id:item.id, ...item.data() })).filter(row => !module.filter || module.filter(row)).sort((a, b) => recordTime(b) - recordTime(a));
-      state.data.set(module.id, rows); state.ready.add(module.id); state.errors.delete(module.id); renderAll();
+      state.data.set(module.id, rows); state.ready.add(module.id); state.errors.delete(module.id); state.reportDirty = true; renderAll();
     }, error => { console.error(`Gagal membaca ${module.collection}`, error); state.errors.add(module.id); renderConnection(); });
     state.stops.push(stop);
   });
 }
 
-function exportCsv() {
-  const rows = filteredRows(); const columns = state.active.columns; const quote = value => `"${String(value).replaceAll('"', '""')}"`;
-  const csv = [columns.map(([, label]) => quote(label)).join(","), ...rows.map(row => columns.map(([key]) => quote(valueOf(row, key))).join(","))].join("\r\n");
-  const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob(["\ufeff", csv], { type:"text/csv;charset=utf-8" })); link.download = `amo-v2-${state.active.id}-${localDateKey()}.csv`; link.click(); URL.revokeObjectURL(link.href);
+function selectedMonthMeta() {
+  const value = reportMonth.value || localDateKey().slice(0, 7);
+  const [year, month] = value.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const label = new Intl.DateTimeFormat("ms-MY", { month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" }).format(new Date(`${value}-15T12:00:00+08:00`));
+  const days = Array.from({ length:daysInMonth }, (_, index) => `${value}-${String(index + 1).padStart(2, "0")}`);
+  return { value, year, month, daysInMonth, days, label };
 }
 
-function filterDescription() {
-  const parts = [];
-  if (fromDate.value || toDate.value) parts.push(`Tempoh: ${fromDate.value || "awal"} hingga ${toDate.value || "terkini"}`);
-  if (search.value.trim()) parts.push(`Carian: “${search.value.trim()}”`);
-  return parts.length ? parts.join(" · ") : "Semua rekod dalam data semasa";
+function monthlyRows(module) {
+  const prefix = selectedMonthMeta().value;
+  return rowsFor(module).filter(row => recordDate(row).startsWith(prefix));
+}
+
+function mark(done) {
+  return `<span class="report-mark ${done ? "done" : "missing"}">${done ? "✓" : "✕"}</span>`;
+}
+
+function kpi(label, value, note = "") {
+  return `<div class="report-kpi"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong>${note ? `<span>${escapeHtml(note)}</span>` : ""}</div>`;
+}
+
+function signatureBlock() {
+  return `<section class="signature-block"><div><span>Disahkan oleh Penyelia</span><strong>&nbsp;</strong><small>Nama dan tandatangan</small></div><div><span>Tarikh pengesahan</span><strong>&nbsp;</strong><small>Tarikh</small></div></section>`;
+}
+
+function reportDocument(title, meta, body) {
+  return `<div class="monthly-document"><header class="print-head"><div class="print-brand">AMO</div><div><small>HOSPITAL KUALA LIPIS · JABATAN KECEMASAN & TRAUMA</small><h1>${escapeHtml(title)}</h1><p>${escapeHtml(meta.label)}</p></div><dl><dt>Dijana</dt><dd>${escapeHtml(new Date().toLocaleString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", dateStyle:"medium", timeStyle:"short" }))}</dd><dt>Oleh</dt><dd>${escapeHtml(roleLabel())}</dd></dl></header>${body}${signatureBlock()}<footer>Dashboard Penerima AMO v2 · Ringkasan bulanan</footer></div>`;
+}
+
+function procedureNames(row) {
+  const values = Array.isArray(row.procedures) ? row.procedures : String(row.procedures || "").split(/[,;·]/);
+  return values.map(item => typeof item === "object" && item ? item.name || item.procedure || item.label || item.type : item).map(item => String(item || "").trim()).filter(Boolean);
+}
+
+function procedureReport(meta) {
+  const rows = monthlyRows(procedure);
+  const totals = new Map();
+  rows.forEach(row => procedureNames(row).forEach(name => totals.set(name, (totals.get(name) || 0) + 1)));
+  const totalProcedures = [...totals.values()].reduce((sum, value) => sum + value, 0);
+  const patients = new Set(rows.map(row => String(row.registrationNumber || row.patientId || row.id || "").trim()).filter(Boolean));
+  const bodyRows = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ms-MY"));
+  return reportDocument("Laporan Bulanan Prosedur", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size || rows.length))}${kpi("Jumlah prosedur", number.format(totalProcedures))}${kpi("Jenis prosedur", number.format(totals.size))}</section><section class="report-section"><h2>Ringkasan prosedur</h2><table><thead><tr><th>Prosedur</th><th>Jumlah</th><th>Peratus</th></tr></thead><tbody>${bodyRows.length ? bodyRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${number.format(count)}</td><td>${totalProcedures ? ((count / totalProcedures) * 100).toFixed(1) : "0.0"}%</td></tr>`).join("") : `<tr><td colspan="3" class="print-empty">Tiada prosedur direkodkan bagi bulan ini.</td></tr>`}</tbody><tfoot><tr><th>Jumlah keseluruhan</th><th>${number.format(totalProcedures)}</th><th>100%</th></tr></tfoot></table></section>`);
+}
+
+function asthmaReport(meta) {
+  const rows = monthlyRows(asthma).sort((a, b) => recordTime(a) - recordTime(b));
+  const patients = new Map();
+  rows.forEach(row => {
+    const key = String(row.patientId || row.patientName || row.id || "Tanpa ID").trim();
+    const entry = patients.get(key) || { name:row.patientName || "—", id:row.patientId || "—", type:row.patientType || "—", rows:[] };
+    entry.rows.push(row); patients.set(key, entry);
+  });
+  const complete = rows.filter(row => !row.pefrNotDone && row.categoryBefore && row.categoryAfter).length;
+  const notDone = rows.filter(row => row.pefrNotDone || row.incomplete).length;
+  const uptriage = rows.filter(row => row.uptriage && !/^(tiada|no|false|-|—)$/i.test(String(row.uptriage).trim())).length;
+  const patientRows = [...patients.values()].map(patient => {
+    const first = patient.rows[0]; const last = patient.rows.at(-1);
+    const completeCount = patient.rows.filter(row => !row.pefrNotDone && row.categoryBefore && row.categoryAfter).length;
+    const dateRange = recordDate(first) === recordDate(last) ? recordDate(last) : `${recordDate(first)} – ${recordDate(last)}`;
+    return `<tr><td>${escapeHtml(dateRange)}</td><td><strong>${escapeHtml(patient.name)}</strong><small>${escapeHtml(patient.id)}</small></td><td>${escapeHtml(patient.type)}</td><td>${number.format(patient.rows.length)}</td><td>${escapeHtml(last.categoryBefore || "—")} → ${escapeHtml(last.categoryAfter || "—")}</td><td>${completeCount}/${patient.rows.length}</td><td>${escapeHtml(last.uptriage || "Tiada")}</td></tr>`;
+  });
+  return reportDocument("Laporan Bulanan Asthma", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size))}${kpi("Jumlah penilaian", number.format(rows.length))}${kpi("Before + After lengkap", rows.length ? `${((complete / rows.length) * 100).toFixed(1)}%` : "0.0%", `${complete}/${rows.length}`)}${kpi("PEFR tidak dibuat", number.format(notDone))}${kpi("Uptriage", number.format(uptriage))}</section><section class="report-section"><h2>Ringkasan setiap pesakit</h2><table><thead><tr><th>Tarikh</th><th>Pesakit / IC-RN</th><th>Kategori</th><th>Penilaian</th><th>Before → After</th><th>Lengkap</th><th>Uptriage</th></tr></thead><tbody>${patientRows.length ? patientRows.join("") : `<tr><td colspan="7" class="print-empty">Tiada penilaian Asthma direkodkan bagi bulan ini.</td></tr>`}</tbody></table></section>`);
+}
+
+function phcBagId(value) {
+  const match = String(value || "").match(/(?:phc|beg)?\s*([12])/i);
+  return match?.[1] || "";
+}
+
+function phcReport(meta) {
+  const rows = monthlyRows(phc);
+  const completed = new Set(rows.map(row => `${recordDate(row)}:${phcBagId(row.bag)}:${shiftId(row.shift)}`).filter(key => !key.includes("::") && !/:$/.test(key)));
+  const expected = meta.daysInMonth * 2 * shiftDefinitions.length;
+  const daily = meta.days.map(date => {
+    const bagDone = bag => shiftDefinitions.every(shift => completed.has(`${date}:${bag}:${shift.id}`));
+    const shiftDone = shift => ["1", "2"].every(bag => completed.has(`${date}:${bag}:${shift.id}`));
+    return `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))}</td><td>PHC 1 ${mark(bagDone("1"))}</td><td>PHC 2 ${mark(bagDone("2"))}</td>${shiftDefinitions.map(shift => `<td>${shift.label} ${mark(shiftDone(shift))}</td>`).join("")}</tr>`;
+  });
+  const rate = expected ? (completed.size / expected) * 100 : 0;
+  return reportDocument("Laporan Bulanan PHC", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Pemeriksaan lengkap", `${number.format(completed.size)}/${number.format(expected)}`)}${kpi("Hari dalam bulan", number.format(meta.daysInMonth))}</section><section class="report-section daily-section"><h2>Catatan harian PHC</h2><p>✓ lengkap · ✕ belum lengkap</p><table><thead><tr><th>Tarikh</th><th>PHC 1</th><th>PHC 2</th><th>Syif pagi</th><th>Syif petang</th><th>Syif malam</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
+}
+
+function girnReport(meta) {
+  const rows = monthlyRows(girn);
+  const completed = new Set(rows.map(row => `${recordDate(row)}:${shiftId(row.shift)}`).filter(key => !key.endsWith(":")));
+  const expected = meta.daysInMonth * shiftDefinitions.length;
+  const daily = meta.days.map(date => `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))}</td>${shiftDefinitions.map(shift => `<td>${shift.label} ${mark(completed.has(`${date}:${shift.id}`))}</td>`).join("")}</tr>`);
+  const rate = expected ? (completed.size / expected) * 100 : 0;
+  return reportDocument("Laporan Bulanan GIRN", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Pemeriksaan syif", `${number.format(completed.size)}/${number.format(expected)}`)}${kpi("Hari dalam bulan", number.format(meta.daysInMonth))}</section><section class="report-section daily-section"><h2>Catatan pemeriksaan GIRN</h2><p>✓ diperiksa · ✕ belum diperiksa</p><table><thead><tr><th>Tarikh</th><th>Syif pagi</th><th>Syif petang</th><th>Syif malam</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
+}
+
+function generateMonthlyReport() {
+  const meta = selectedMonthMeta();
+  state.reportMonth = meta.value;
+  state.reportHtml = state.active.id === "procedure" ? procedureReport(meta) : state.active.id === "asthma" ? asthmaReport(meta) : state.active.id === "phc" ? phcReport(meta) : girnReport(meta);
+  state.reportDirty = false;
+  reportPreview.innerHTML = state.reportHtml;
+  status.textContent = `Laporan ${state.active.label} · ${meta.label} siap dijana.`;
+  printPreviewBtn.disabled = false;
+  return state.reportHtml;
 }
 
 function openPrintPreview() {
-  const rows = filteredRows(); const columns = state.active.columns;
-  document.querySelector("#printReport").innerHTML = `<header class="print-head"><div class="print-brand">AMO</div><div><small>HOSPITAL KUALA LIPIS · EMERGENCY & TRAUMA DEPARTMENT</small><h1>Laporan ${escapeHtml(state.active.label)}</h1><p>${escapeHtml(filterDescription())}</p></div><dl><dt>Dijana</dt><dd>${escapeHtml(new Date().toLocaleString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", dateStyle:"medium", timeStyle:"short" }))}</dd><dt>Rekod</dt><dd>${number.format(rows.length)}</dd></dl></header><section class="print-context"><div><small>MODUL</small><strong>${escapeHtml(state.active.label)}</strong></div><div><small>TEMPOH</small><strong>${escapeHtml(fromDate.value || "Semua")} — ${escapeHtml(toDate.value || "Terkini")}</strong></div><div><small>DISEDIAKAN OLEH</small><strong>${escapeHtml(actorName())}</strong></div></section><section class="print-table-wrap"><table><thead><tr>${columns.map(([, label]) => `<th>${escapeHtml(label)}</th>`).join("")}</tr></thead><tbody>${rows.length ? rows.map(row => `<tr>${columns.map(([key]) => `<td>${escapeHtml(valueOf(row, key))}</td>`).join("")}</tr>`).join("") : `<tr><td colspan="${columns.length}" class="print-empty">Tiada rekod sepadan dengan tapisan.</td></tr>`}</tbody></table></section><footer>Laporan dijana daripada Dashboard Penerima AMO v2 · Data mengikut modul dan tapisan yang dipilih.</footer>`;
-  document.querySelector("#previewHint").textContent = `${rows.length} rekod · ${filterDescription()}`;
-  document.body.classList.add("preview-open"); printDialog.showModal();
+  if (state.reportDirty || !state.reportHtml || state.reportMonth !== selectedMonthMeta().value) generateMonthlyReport();
+  document.querySelector("#printReport").innerHTML = state.reportHtml;
+  document.querySelector("#previewHint").textContent = `${state.active.label} · ${selectedMonthMeta().label}`;
+  document.body.classList.add("preview-open");
+  requestAnimationFrame(() => printDialog.showModal());
 }
 
 function closePrintPreview() { if (printDialog.open) printDialog.close(); document.body.classList.remove("preview-open", "printing"); }
-function printReport() { document.body.classList.add("printing"); window.print(); }
+function printReport() {
+  document.body.classList.add("printing");
+  requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+}
 
-modules.forEach(module => {
+primaryModules.forEach(module => {
   const button = document.createElement("button"); button.type = "button"; button.dataset.id = module.id; button.textContent = module.label; button.addEventListener("click", () => selectModule(module)); tabs.append(button);
 });
-[search, fromDate, toDate].forEach(input => input.addEventListener("input", renderTable));
-document.querySelector("#resetBtn").addEventListener("click", () => { search.value = ""; fromDate.value = ""; toDate.value = ""; renderTable(); });
-document.querySelector("#csvBtn").addEventListener("click", exportCsv);
+reportMonth.value = localDateKey().slice(0, 7);
+reportMonth.addEventListener("change", () => {
+  state.reportDirty = true;
+  state.reportHtml = "";
+  reportPreview.innerHTML = `<p class="empty">Bulan ditukar. Tekan <strong>Jana laporan bulanan</strong>.</p>`;
+  status.textContent = "Laporan perlu dijana semula untuk bulan yang dipilih.";
+  printPreviewBtn.disabled = true;
+});
+generateReportBtn.addEventListener("click", generateMonthlyReport);
 document.querySelector("#printPreviewBtn").addEventListener("click", openPrintPreview);
 document.querySelector("#closePreviewBtn").addEventListener("click", closePrintPreview);
 document.querySelector("#printBtn").addEventListener("click", printReport);
@@ -428,7 +504,7 @@ if (!user || user.isAnonymous || !isSupervisor(profile)) {
   gate.innerHTML = `<h2>Akses tidak dibenarkan</h2><p>Log masuk di dashboard utama menggunakan akaun admin atau penyelia yang diluluskan.</p><a href="../">Kembali ke dashboard utama</a>`;
 } else {
   sessionUser = user; sessionProfile = profile;
-  document.querySelector("#userLabel").textContent = `${profile.name || user.displayName || user.email} · ${profile.role === "admin" ? "Admin" : "Penyelia"}`;
+  document.querySelector("#userLabel").textContent = `${profile.name || user.displayName || user.email} · ${roleLabel()}`;
   document.querySelector("#supervisorCentre").hidden = false;
   gate.hidden = true; dashboard.hidden = false;
   [...tabs.children].find(button => button.dataset.id === state.active.id)?.classList.add("active");
