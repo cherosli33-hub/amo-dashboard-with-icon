@@ -1,4 +1,4 @@
-const CACHE = "amo-dashboard-v2-firebase-2";
+const CACHE = "amo-dashboard-v2-firebase-3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,7 +9,9 @@ const ASSETS = [
   "./config.js?v=7",
   "./pefr.mjs",
   "./asthma.mjs?v=14",
-  "./shared/firebase/bootstrap.js?v=2",
+  "./shared/firebase/bootstrap.js?v=3",
+  "./amo-procedure-enhancements.js?v=2",
+  "./asthma-enhancements.js?v=2",
   "./shared/firebase/legacy-adapter.js",
   "./shared/firebase/core.js",
   "./shared/firebase/auth.js",
@@ -59,7 +61,7 @@ const AMO_HEADER_HTML = `
 
 function isAmoPage(request){
   const url = new URL(request.url);
-  return url.origin === self.location.origin && /\/amo\.html$/.test(url.pathname);
+  return url.origin === self.location.origin && /\/amo(?:\.html)?\/?$/.test(url.pathname);
 }
 
 async function withAmoHeader(response){

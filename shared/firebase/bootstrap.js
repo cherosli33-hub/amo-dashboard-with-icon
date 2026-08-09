@@ -31,12 +31,12 @@
     document.head.appendChild(script);
   }
 
-  const path = location.pathname;
-  if (path.endsWith("/amo.html") || path.endsWith("amo.html")) {
-    loadEnhancement(new URL("../../amo-procedure-enhancements.js?v=1", document.currentScript.src).href);
+  const path = location.pathname.replace(/\/+$/, "");
+  if (/\/amo(?:\.html)?$/.test(path)) {
+    loadEnhancement(new URL("../../amo-procedure-enhancements.js?v=2", document.currentScript.src).href);
   }
-  if (path.endsWith("/asthma.html") || path.endsWith("asthma.html")) {
-    loadEnhancement(new URL("../../asthma-enhancements.js?v=1", document.currentScript.src).href);
+  if (/\/asthma(?:\.html)?$/.test(path)) {
+    loadEnhancement(new URL("../../asthma-enhancements.js?v=2", document.currentScript.src).href);
   }
   if (path.includes("/girn")) {
     loadEnhancement(new URL("../../girn/girn-enhancements.js?v=2", document.currentScript.src).href);

@@ -22,6 +22,7 @@ assert(read("shared/firebase/legacy-adapter.js").includes("doctorInstructionConf
 assert(read("firestore.rules").includes("request.resource.data.doctorInstructionConfirmed == true"),"Rules belum menolak rekod Prosedur tanpa arahan doktor.");
 assert(read("data-dashboard/app.js").includes("actionSources = [phc, phcFindings")&&read("data-dashboard/app.js").includes("COLLECTIONS.actionAudit"),"Pengesahan PHC atau jejak audit pusat belum lengkap.");
 assert(read("firestore.rules").includes("supervisor_action_audit"),"Rules jejak audit penyelia tiada.");
+assert(read("shared/firebase/bootstrap.js").includes('/\\/amo(?:\\.html)?$/')&&read("shared/firebase/bootstrap.js").includes('/\\/asthma(?:\\.html)?$/'),"Cloudflare extensionless routes belum memuatkan enhancement Prosedur/Asma.");
 
 const frontendFiles=["amo-config.js","config.js","phc-checklist/js/config.js","girn/_next/static/chunks/01asyj8k~np8o.js"];
 frontendFiles.forEach(file=>assert(!/AKfycb[A-Za-z0-9_-]+/.test(read(file)),`${file} masih mengandungi endpoint Apps Script live.`));
