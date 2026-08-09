@@ -1010,6 +1010,14 @@ function formatReportDate(key){
   return date ? date.toLocaleDateString("ms-MY", { day:"2-digit", month:"2-digit", year:"numeric" }) : key;
 }
 
+function fastPrint(){
+  document.documentElement.classList.add("print-preparing");
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    window.print();
+    document.documentElement.classList.remove("print-preparing");
+  }));
+}
+
 function reportPreviewHtml(cases){
   const range = reportDateRange();
   const shiftLabel = state.reportShift === "all" ? "Semua syif" : `Syif ${shiftMeta(state.reportShift)?.label || state.reportShift}`;
@@ -1055,7 +1063,7 @@ function procedureReportHtml(){
       <p class="report-data-note">Data penuh dari Firebase hanya dimuatkan selepas butang ini ditekan.</p>
       ${state.reportError ? `<div class="sync-warn report-error">${esc(state.reportError)}</div>` : ""}
     </section>
-    ${Array.isArray(state.reportCases) ? `<div class="report-actions"><span>${esc(reportDateRange().label)}</span><button type="button" onclick="window.print()">Cetak / Simpan PDF</button></div>${reportPreviewHtml(state.reportCases)}` : `<div class="report-placeholder">Pilih tempoh dan syif, kemudian tekan <strong>Jana Laporan A4</strong>.</div>`}`;
+    ${Array.isArray(state.reportCases) ? `<div class="report-actions"><span>${esc(reportDateRange().label)}</span><button type="button" onclick="fastPrint()">Cetak / Simpan PDF</button></div>${reportPreviewHtml(state.reportCases)}` : `<div class="report-placeholder">Pilih tempoh dan syif, kemudian tekan <strong>Jana Laporan A4</strong>.</div>`}`;
 }
 
 function dailyRecordsHtml(todayCases, now){
@@ -1427,4 +1435,3 @@ window.addEventListener("beforeunload",()=>stopProcedureLive?.());
 </script>
 </body>
 </html>
-

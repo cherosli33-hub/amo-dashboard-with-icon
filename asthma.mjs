@@ -596,6 +596,15 @@ const reportWeekDate = document.querySelector("#reportWeekDate");
 const reportMonth = document.querySelector("#reportMonth");
 const generatePefrReportButton = document.querySelector("#generatePefrReport");
 const reportLoadStatus = document.querySelector("#reportLoadStatus");
+let reportDataCache = { records: null, loadedAt: 0 };
+
+function fastPrint() {
+  document.documentElement.classList.add("print-preparing");
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    window.print();
+    document.documentElement.classList.remove("print-preparing");
+  }));
+}
 
 function dateFromKey(value) {
   const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -703,9 +712,13 @@ async function generatePefrReport() {
   generatePefrReportButton.textContent = "Mengambil data…";
   reportLoadStatus.textContent = "Meminta rekod terkini daripada Firebase…";
   try {
-    const response = await sheetRequest("listAsthmaAssessments");
-    if (!response?.ok) throw new Error(response?.error || "Gagal membaca data Firebase.");
-    const records = Array.isArray(response.records) ? response.records : [];
+    let records = reportDataCache.records;
+    if (!records || Date.now() - reportDataCache.loadedAt > 30000) {
+      const response = await sheetRequest("listAsthmaAssessments");
+      if (!response?.ok) throw new Error(response?.error || "Gagal membaca data Firebase.");
+      records = Array.isArray(response.records) ? response.records : [];
+      reportDataCache = { records, loadedAt: Date.now() };
+    }
     sharedRecords = records;
     const period = reportPeriod();
     const selected = filteredReportRecords(records, period);
@@ -730,7 +743,7 @@ function initPefrReport() {
     reportMonthField.hidden = weekly;
   });
   generatePefrReportButton.addEventListener("click", generatePefrReport);
-  document.querySelector("#printPefrReport").addEventListener("click", () => window.print());
+  document.querySelector("#printPefrReport").addEventListener("click", fastPrint);
 }
 function setView(viewId) {
   document.querySelectorAll(".view").forEach(view => view.classList.toggle("is-active", view.id === viewId));

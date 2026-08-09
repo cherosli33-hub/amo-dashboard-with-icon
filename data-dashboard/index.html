@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
   <title>Dashboard Penerima · AMO Dashboard v2</title>
-  <link rel="stylesheet" href="./styles.css?v=5">
+  <link rel="stylesheet" href="./styles.css?v=6">
 </head>
 <body>
   <header class="topbar no-print">
@@ -41,7 +41,7 @@
       <section class="overview-grid">
         <section class="panel attention-panel" aria-labelledby="attentionTitle">
           <div class="section-heading">
-            <div><p class="eyebrow">PERLU PERHATIAN</p><h2 id="attentionTitle">Perkara yang perlukan manusia</h2></div>
+            <div><p class="eyebrow">PERLU PERHATIAN</p><h2 id="attentionTitle">Perkara yang perlukan perhatian</h2></div>
             <strong id="attentionCount" class="attention-count">0</strong>
           </div>
           <div id="attentionList" class="attention-list"><p class="empty">Menunggu data…</p></div>
@@ -53,17 +53,12 @@
         </section>
       </section>
 
-      <section class="overview-grid lower-grid">
+      <section class="overview-grid lower-grid single-column">
         <section class="panel activity-panel" aria-labelledby="activityTitle">
           <div class="section-heading"><div><p class="eyebrow">AKTIVITI HARI INI</p><h2 id="activityTitle">Aliran terkini</h2></div><small>8 aktiviti terbaru</small></div>
           <div id="recentList" class="timeline"><p class="empty">Menunggu data…</p></div>
         </section>
 
-        <section class="panel trend-panel" aria-labelledby="trendTitle">
-          <div class="section-heading"><div><p class="eyebrow">7 HARI</p><h2 id="trendTitle">Ringkasan & trend</h2></div></div>
-          <div id="weekSummary" class="week-summary"></div>
-          <div id="weekTrend" class="week-trend" aria-label="Trend jumlah rekod tujuh hari"></div>
-        </section>
       </section>
 
       <section id="supervisorCentre" class="panel supervisor-centre" aria-labelledby="supervisorTitle" hidden>
@@ -93,22 +88,23 @@
         <div id="actionList" class="action-list"><p class="empty">Menunggu data tindakan…</p></div>
       </section>
 
-      <section class="panel data-panel">
+      <section class="panel data-panel report-centre" aria-labelledby="monthlyReportTitle">
         <div class="toolbar">
-          <nav id="tabs" aria-label="Jenis data"></nav>
+          <div>
+            <p class="eyebrow">LAPORAN BULANAN</p>
+            <h2 id="monthlyReportTitle">Ringkasan Prosedur, Asthma, PHC & GIRN</h2>
+          </div>
           <div class="export-actions">
-            <button id="printPreviewBtn" type="button">Cetak / PDF</button>
-            <button id="csvBtn" class="secondary" type="button">Eksport CSV</button>
+            <button id="printPreviewBtn" type="button" disabled>Cetak / PDF</button>
           </div>
         </div>
-        <div class="filters no-print" aria-label="Tapisan rekod">
-          <label class="search-field"><span>Cari</span><input id="searchInput" type="search" placeholder="Nama, ID, syif, status…"></label>
-          <label><span>Dari tarikh</span><input id="fromDate" type="date"></label>
-          <label><span>Hingga tarikh</span><input id="toDate" type="date"></label>
-          <button id="resetBtn" class="ghost" type="button">Kosongkan tapisan</button>
+        <div class="report-controls no-print">
+          <nav id="tabs" aria-label="Jenis laporan bulanan"></nav>
+          <label><span>Bulan laporan</span><input id="reportMonth" type="month"></label>
+          <button id="generateReportBtn" type="button">Jana laporan bulanan</button>
         </div>
-        <div class="table-meta"><p id="status" role="status"></p><span id="connectionState">Menyambung…</span></div>
-        <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
+        <div class="table-meta"><p id="status" role="status">Pilih bulan dan jana laporan.</p><span id="connectionState">Menyambung…</span></div>
+        <div id="monthlyReportPreview" class="monthly-report-preview"><p class="empty">Laporan bulanan belum dijana.</p></div>
       </section>
     </div>
   </main>
@@ -123,6 +119,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=5"></script>
+  <script type="module" src="./app.js?v=6"></script>
 </body>
 </html>

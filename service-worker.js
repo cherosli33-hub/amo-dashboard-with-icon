@@ -1,4 +1,4 @@
-const CACHE = "amo-dashboard-v2-firebase-5";
+const CACHE = "amo-dashboard-v2-firebase-6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -19,8 +19,8 @@ const ASSETS = [
   "./shared/firebase/users.js",
   "./shared/firebase/portal-auth.js?v=3",
   "./data-dashboard/",
-  "./data-dashboard/app.js?v=5",
-  "./data-dashboard/styles.css?v=5",
+  "./data-dashboard/app.js?v=6",
+  "./data-dashboard/styles.css?v=6",
   "./data-dashboard/modules/procedure.js",
   "./data-dashboard/modules/asthma.js",
   "./data-dashboard/modules/phc.js",
@@ -34,7 +34,7 @@ const ASSETS = [
   "./apple-touch-icon.png?v=4",
   "./favicon.png?v=4",
   "./girn/girn-radio-logo.jpg?v=1",
-  "./girn/girn-enhancements.js?v=1",
+  "./girn/girn-enhancements.js?v=3",
   "./girn/",
   "./girn/index.html",
   "./references/adult-pefr-chart.jpeg",
