@@ -4,7 +4,8 @@ export default {
   id: "supervisor-audit",
   label: "Jejak Audit",
   shortLabel: "AUDIT",
-  collection: COLLECTIONS.actionAudit,
+  collection: COLLECTIONS.actionTasks,
+  filter: row => row.recordType === "audit",
   columns: [
     ["actedAt", "Tarikh / masa"],
     ["sourceModule", "Modul"],

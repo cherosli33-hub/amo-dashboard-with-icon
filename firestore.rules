@@ -76,15 +76,11 @@ service cloud.firestore {
 
     // Saluran umum untuk notifikasi/tindakan penyelia daripada mana-mana modul.
     match /supervisor_actions/{documentId} {
-      allow create: if signedIn();
-      allow read, update: if staff();
+      allow create: if signedIn()
+        && (request.resource.data.recordType != 'audit' || staff());
+      allow read: if staff();
+      allow update: if staff() && resource.data.recordType != 'audit';
       allow delete: if false;
-    }
-
-    // Log tindakan kekal: hanya staf boleh menambah/membaca dan tiada rekod boleh diubah semula.
-    match /supervisor_action_audit/{documentId} {
-      allow create, read: if staff();
-      allow update, delete: if false;
     }
   }
 }

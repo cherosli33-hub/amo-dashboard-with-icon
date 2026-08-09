@@ -20,8 +20,8 @@ assert(read("shared/firebase/auth.js").includes("browserLocalPersistence")&&read
 assert(read("amo-config.js").includes('environment: "firebase-v2"'),"Konfigurasi Prosedur bukan firebase-v2.");
 assert(read("shared/firebase/legacy-adapter.js").includes("doctorInstructionConfirmed !== true"),"Validasi arahan doktor belum dikuatkuasakan pada lapisan simpanan.");
 assert(read("firestore.rules").includes("request.resource.data.doctorInstructionConfirmed == true"),"Rules belum menolak rekod Prosedur tanpa arahan doktor.");
-assert(read("data-dashboard/app.js").includes("actionSources = [phc, phcFindings")&&read("data-dashboard/app.js").includes("COLLECTIONS.actionAudit"),"Pengesahan PHC atau jejak audit pusat belum lengkap.");
-assert(read("firestore.rules").includes("supervisor_action_audit"),"Rules jejak audit penyelia tiada.");
+assert(read("data-dashboard/app.js").includes("actionSources = [phc, phcFindings")&&read("data-dashboard/app.js").includes('recordType:"audit"'),"Pengesahan PHC atau jejak audit pusat belum lengkap.");
+assert(read("firestore.rules").includes("resource.data.recordType != 'audit'"),"Rules belum mengunci jejak audit penyelia.");
 assert(read("shared/firebase/bootstrap.js").includes('/\\/amo(?:\\.html)?$/')&&read("shared/firebase/bootstrap.js").includes('/\\/asthma(?:\\.html)?$/'),"Cloudflare extensionless routes belum memuatkan enhancement Prosedur/Asma.");
 
 const frontendFiles=["amo-config.js","config.js","phc-checklist/js/config.js","girn/_next/static/chunks/01asyj8k~np8o.js"];

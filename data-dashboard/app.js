@@ -14,7 +14,7 @@ import supervisorAudit from "./modules/supervisor-audit.js";
 
 const primaryModules = [procedure, asthma, phc, girn];
 const modules = [...primaryModules, phcFindings, girnFindings, supervisorAudit];
-const actionTaskModule = { id:"supervisor-actions", label:"Tindakan Umum", shortLabel:"UMUM", collection:COLLECTIONS.actionTasks, finding:true };
+const actionTaskModule = { id:"supervisor-actions", label:"Tindakan Umum", shortLabel:"UMUM", collection:COLLECTIONS.actionTasks, finding:true, filter:row => row.recordType !== "audit" };
 const streams = [...modules, actionTaskModule];
 const actionSources = [phc, phcFindings, girnFindings, actionTaskModule];
 const state = { active: procedure, data: new Map(), ready: new Set(), errors: new Set(), stops: [], selectedActions:new Set(), acting:false };
@@ -239,7 +239,10 @@ async function runSelectedAction(mode) {
       chunk.forEach(({ module, row }) => {
         const changes = changesForAction(module, mode);
         batch.update(doc(db, module.collection, row.id), changes);
-        batch.set(doc(collection(db, COLLECTIONS.actionAudit)), {
+        batch.set(doc(collection(db, COLLECTIONS.actionTasks)), {
+          recordType:"audit",
+          status:"completed",
+          state:"completed",
           sourceCollection:module.collection,
           sourceId:row.id,
           sourceModule:module.id,
@@ -318,7 +321,9 @@ function selectModule(module) {
 function startLiveData() {
   streams.forEach(module => {
     const stop = onSnapshot(query(collection(db, module.collection), limit(5000)), snapshot => {
-      const rows = snapshot.docs.map(item => ({ id:item.id, ...item.data() })).sort((a, b) => recordTime(b) - recordTime(a));
+      const rows = snapshot.docs.map(item => ({ id:item.id, ...item.data() }))
+        .filter(row => !module.filter || module.filter(row))
+        .sort((a, b) => recordTime(b) - recordTime(a));
       state.data.set(module.id, rows);
       state.ready.add(module.id);
       state.errors.delete(module.id);
