@@ -10,12 +10,13 @@ import phc from "./modules/phc.js";
 import girn from "./modules/girn.js";
 import phcFindings from "./modules/phc-findings.js";
 import girnFindings from "./modules/girn-findings.js";
+import supervisorAudit from "./modules/supervisor-audit.js";
 
 const primaryModules = [procedure, asthma, phc, girn];
-const modules = [...primaryModules, phcFindings, girnFindings];
+const modules = [...primaryModules, phcFindings, girnFindings, supervisorAudit];
 const actionTaskModule = { id:"supervisor-actions", label:"Tindakan Umum", shortLabel:"UMUM", collection:COLLECTIONS.actionTasks, finding:true };
 const streams = [...modules, actionTaskModule];
-const actionSources = [phcFindings, girnFindings, actionTaskModule];
+const actionSources = [phc, phcFindings, girnFindings, actionTaskModule];
 const state = { active: procedure, data: new Map(), ready: new Set(), errors: new Set(), stops: [], selectedActions:new Set(), acting:false };
 const number = new Intl.NumberFormat("ms-MY");
 const gate = document.querySelector("#gate");
@@ -115,7 +116,8 @@ function normalizedStatus(row) {
   return String(row.actionStatus || row.state || row.status || "").trim().toLocaleLowerCase("ms-MY");
 }
 
-function isOutstanding(row) {
+function isOutstanding(module, row) {
+  if (module.id === "phc") return row.verified !== true;
   const done = new Set(["selesai", "telah diambil tindakan", "ditutup", "diambil maklum", "disahkan", "completed", "closed", "acknowledged", "verified"]);
   return !done.has(normalizedStatus(row));
 }
@@ -124,7 +126,7 @@ function actionKey(module, row) { return `${module.id}:${row.id}`; }
 
 function actionItems() {
   return actionSources.flatMap(module => rowsFor(module)
-    .filter(isOutstanding)
+    .filter(row => isOutstanding(module, row))
     .map(row => ({ module, row, key:actionKey(module, row), time:recordTime(row) })))
     .sort((a, b) => b.time - a.time);
 }
@@ -142,12 +144,14 @@ function renderSummary() {
 }
 
 function actionTitleFor(module, row) {
+  if (module.id === "phc") return [row.bag, row.shift].filter(Boolean).join(" · ") || "Pemeriksaan PHC";
   if (module.id === "phc-findings") return row.item || row.type || "Penemuan PHC";
   if (module.id === "girn-findings") return row.device || row.inspectionStatus || "Penemuan GIRN";
   return row.title || row.subject || row.type || "Tindakan penyelia";
 }
 
 function actionDetailFor(module, row) {
+  if (module.id === "phc") return [row.date, row.ppp, "Belum disahkan"].filter(Boolean).join(" · ");
   if (module.id === "phc-findings") return [row.date, row.bagShift, row.type, row.note].filter(Boolean).join(" · ");
   if (module.id === "girn-findings") return [row.date, row.shift, row.inspectionStatus, row.note, row.reporter].filter(Boolean).join(" · ");
   return [recordDate(row), row.module, row.message || row.detail || row.note, row.reporter || row.createdBy].filter(Boolean).join(" · ");
@@ -156,6 +160,7 @@ function actionDetailFor(module, row) {
 function actionBadgeFor(module, row) {
   const required = row.requiredAction || row.actionType;
   if (required) return required;
+  if (module.id === "phc") return "PHC · Perlu pengesahan";
   if (module.id === "phc-findings") return "PHC · Perlu tindakan";
   if (module.id === "girn-findings") return "GIRN · Perlu tindakan";
   return "Perlu tindakan";
@@ -202,6 +207,9 @@ function changesForAction(module, mode) {
   const email = sessionUser?.email || sessionProfile?.email || "";
   const label = mode === "verify" ? "Disahkan" : "Diambil maklum";
   const common = { action:label, actionBy:actor, actionByEmail:email, actionAt:serverTimestamp() };
+  if (module.id === "phc") {
+    return { ...common, verified:true, verifiedBy:actor, verifiedEmail:email, verifiedAt:serverTimestamp() };
+  }
   if (module.id === "phc-findings") {
     return mode === "verify"
       ? { ...common, status:"Selesai", verifiedBy:actor, verifiedByEmail:email, verifiedAt:serverTimestamp() }
@@ -224,9 +232,30 @@ async function runSelectedAction(mode) {
   actionStatus.textContent = `Menyimpan tindakan untuk ${items.length} rekod…`;
   renderActions();
   try {
-    const batch = writeBatch(db);
-    items.forEach(({ module, row }) => batch.update(doc(db, module.collection, row.id), changesForAction(module, mode)));
-    await batch.commit();
+    const chunks = [];
+    for (let index = 0; index < items.length; index += 200) chunks.push(items.slice(index, index + 200));
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(({ module, row }) => {
+        const changes = changesForAction(module, mode);
+        batch.update(doc(db, module.collection, row.id), changes);
+        batch.set(doc(collection(db, COLLECTIONS.actionAudit)), {
+          sourceCollection:module.collection,
+          sourceId:row.id,
+          sourceModule:module.id,
+          sourceTitle:actionTitleFor(module, row),
+          sourceDetail:actionDetailFor(module, row),
+          actionType:mode,
+          actionLabel:mode === "verify" ? "Disahkan" : "Diambil maklum",
+          actorUid:sessionUser?.uid || "",
+          actorName:actorName(),
+          actorEmail:sessionUser?.email || sessionProfile?.email || "",
+          actorRole:sessionProfile?.role || "",
+          actedAt:serverTimestamp()
+        });
+      });
+      await batch.commit();
+    }
     state.selectedActions.clear();
     actionStatus.textContent = `${items.length} rekod berjaya ${verb === "sahkan" ? "disahkan" : "diambil maklum"} oleh ${actorName()}.`;
   } catch (error) {

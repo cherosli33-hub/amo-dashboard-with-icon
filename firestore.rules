@@ -44,7 +44,9 @@ service cloud.firestore {
 
     // Rekod operasi: pengguna biasa menggunakan Firebase Anonymous Auth di belakang tabir.
     match /procedure_cases/{documentId} {
-      allow read, create, update: if signedIn();
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.doctorInstructionConfirmed == true;
       allow delete: if false;
     }
     match /asthma_assessments/{documentId} {
@@ -77,6 +79,12 @@ service cloud.firestore {
       allow create: if signedIn();
       allow read, update: if staff();
       allow delete: if false;
+    }
+
+    // Log tindakan kekal: hanya staf boleh menambah/membaca dan tiada rekod boleh diubah semula.
+    match /supervisor_action_audit/{documentId} {
+      allow create, read: if staff();
+      allow update, delete: if false;
     }
   }
 }

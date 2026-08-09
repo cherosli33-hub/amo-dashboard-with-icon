@@ -30,6 +30,8 @@ Branch `firebase-v2` hanya mempunyai enam fail asas dalam `shared/firebase/`. Ti
 - `girn_inspections/{recordId}` - satu pemeriksaan dengan `devices[]`.
 - `girn_findings/{findingId}` - status Baharu / Diambil maklum / Selesai dan jejak tindakan.
 - `users/{uid}` - profil Google dan peranan `pending`, `supervisor` atau `admin`.
+- `supervisor_actions/{taskId}` - notifikasi/tindakan umum daripada mana-mana modul.
+- `supervisor_action_audit/{auditId}` - log kekal siapa bertindak, tindakan, sumber dan masa.
 
 Pengguna biasa mendapat sesi Firebase Anonymous secara senyap; tiada skrin login. Login Google menggunakan persistence tempatan, jadi sesi admin/penyelia digunakan semula oleh portal, dashboard data dan PHC sehingga Log keluar.
 
@@ -40,9 +42,9 @@ Importer idempotent berada di `tools/firebase-import/import.mjs`. Ia menjalankan
 ## Konfigurasi dan deployment selesai (9 Ogos 2026)
 
 - Akaun staf yang telah diluluskan dalam kod dan Firestore Rules:
-  - Admin: `cherosli33@gmail.com`
-  - Supervisor: `yusseriharon6835@gmail.com`
-- Kedua-dua akaun menerima peranan secara automatik pada login Google pertama.
+  - Admin: `cherosli33@gmail.com`, `Cherosli@moh.gov.my`
+  - Supervisor: `yusseriharon6835@gmail.com`, `mdrafi@moh.gov.my`
+- Semua akaun di atas menerima peranan secara automatik pada login Google pertama (padanan e-mel tidak mengira huruf besar/kecil).
 - Firebase Authentication `Anonymous` dan `Google` telah diaktifkan; auto-cleanup anonymous 30 hari turut aktif.
 - Firestore Rules telah diterbitkan dan domain `amo-dashboard-v2.pages.dev` telah ditambah kepada Authorized Domains.
 - Cloudflare Pages menggunakan branch production `firebase-v2`, build command kosong dan output directory `/`.

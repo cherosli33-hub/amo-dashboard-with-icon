@@ -18,6 +18,10 @@ assert(read("girn/_next/static/chunks/01asyj8k~np8o.js").includes("firebase-v2-g
 assert(read("index.html").includes("portal-auth.js")&&read("index.html").includes("data-dashboard"),"SSO atau dashboard pusat belum dipautkan.");
 assert(read("shared/firebase/auth.js").includes("browserLocalPersistence")&&read("shared/firebase/auth.js").includes("signInAnonymously"),"Persistence atau sesi pengguna biasa tiada.");
 assert(read("amo-config.js").includes('environment: "firebase-v2"'),"Konfigurasi Prosedur bukan firebase-v2.");
+assert(read("shared/firebase/legacy-adapter.js").includes("doctorInstructionConfirmed !== true"),"Validasi arahan doktor belum dikuatkuasakan pada lapisan simpanan.");
+assert(read("firestore.rules").includes("request.resource.data.doctorInstructionConfirmed == true"),"Rules belum menolak rekod Prosedur tanpa arahan doktor.");
+assert(read("data-dashboard/app.js").includes("actionSources = [phc, phcFindings")&&read("data-dashboard/app.js").includes("COLLECTIONS.actionAudit"),"Pengesahan PHC atau jejak audit pusat belum lengkap.");
+assert(read("firestore.rules").includes("supervisor_action_audit"),"Rules jejak audit penyelia tiada.");
 
 const frontendFiles=["amo-config.js","config.js","phc-checklist/js/config.js","girn/_next/static/chunks/01asyj8k~np8o.js"];
 frontendFiles.forEach(file=>assert(!/AKfycb[A-Za-z0-9_-]+/.test(read(file)),`${file} masih mengandungi endpoint Apps Script live.`));

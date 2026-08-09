@@ -77,6 +77,9 @@ async function procedureRequest(action, body) {
   }
   const record = body || {};
   if (!record.id || !record.date || !record.shift || !(record.procedures || []).length) throw new Error("Rekod prosedur tidak lengkap.");
+  if (record.doctorInstructionConfirmed !== true) {
+    throw new Error("Pengesahan arahan Dr wajib ditanda sebelum rekod prosedur disimpan.");
+  }
   await save(COLLECTIONS.procedure, record.id, {
     ...record,
     module: "procedure",
