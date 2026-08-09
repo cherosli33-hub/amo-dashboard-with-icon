@@ -10,7 +10,11 @@ window.AMO_CONFIG = Object.freeze({
 // remains untouched while validation/report behaviour can evolve safely.
 document.addEventListener("DOMContentLoaded", () => {
   const normalized = value => String(value || "").trim().toLowerCase().replace(/[’‘]/g, "'");
-  const secondaryExempt = new Set(["vital sign", "dressing", "ryle's tube", "cbd"]);
+  const secondaryExempt = new Set([
+    "vital sign", "vital signs", "dressing", "cbd", "change cbd",
+    "ryle's tube", "ryle tube", "ryles tube", "ryls tube",
+    "change ryle's tube", "change ryle tube", "change ryles tube", "change ryls tube"
+  ]);
 
   function doctorRequired(name, zone) {
     const procedure = normalized(name);

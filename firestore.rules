@@ -62,10 +62,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Penemuan boleh dihantar oleh app biasa, tetapi tindakan/kemas kini hanya oleh penyelia/admin.
+    // Penemuan boleh dihantar oleh app biasa. Hanya restock boleh diselesaikan
+    // oleh pengguna PHC; tindakan lain kekal untuk penyelia/admin.
     match /phc_findings/{documentId} {
       allow read, create: if signedIn();
-      allow update: if staff();
+      // Pengguna PHC menyelesaikan restock sendiri. Catatan kekal hanya boleh
+      // dikemas kini oleh penyelia/admin melalui Dashboard Penerima.
+      allow update: if staff()
+        || (signedIn()
+          && resource.data.type == 'shortage'
+          && request.resource.data.type == 'shortage'
+          && request.resource.data.status == 'Telah diambil tindakan'
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['action', 'actionAt', 'status', 'updatedAt']));
       allow delete: if false;
     }
     match /girn_findings/{documentId} {
