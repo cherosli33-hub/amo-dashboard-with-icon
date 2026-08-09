@@ -33,7 +33,7 @@
 
   const path = location.pathname.replace(/\/+$/, "");
   if (/\/amo(?:\.html)?$/.test(path)) {
-    loadEnhancement(new URL("../../amo-procedure-enhancements.js?v=2", document.currentScript.src).href);
+    loadEnhancement(new URL("../../amo-procedure-enhancements.js?v=3", document.currentScript.src).href);
   }
   if (/\/asthma(?:\.html)?$/.test(path)) {
     loadEnhancement(new URL("../../asthma-enhancements.js?v=2", document.currentScript.src).href);
