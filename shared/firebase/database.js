@@ -21,7 +21,8 @@ export const COLLECTIONS = Object.freeze({
   phc: "phc_inspections",
   phcFindings: "phc_findings",
   asthma: "asthma_assessments",
-  procedure: "procedure_cases"
+  procedure: "procedure_cases",
+  actionTasks: "supervisor_actions"
 });
 
 export function serverNow() {
