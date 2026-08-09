@@ -14,15 +14,15 @@ document.head.appendChild(style);
 if (!document.body) await new Promise(resolve => document.addEventListener("DOMContentLoaded", resolve, { once:true }));
 
 let confirmed = false;
-let patched = false;
+let savePatched = false;
 
-function syncSaveButton() {
-  const box = document.querySelector("#doctor-order-confirm-checkbox");
-  const save = document.querySelector("#save-btn");
-  if (!save || !box) return;
-  const patientReady = String(window.state?.registrationNumber || "").trim().length > 0;
-  const selectedCount = Object.keys(window.state?.selectedProcs || {}).length;
-  save.disabled = !patientReady || selectedCount === 0 || Boolean(window.state?.saving) || !box.checked;
+function warnRequired() {
+  const block = document.querySelector("#doctor-order-confirm");
+  block?.classList.add("required");
+  const checkbox = document.querySelector("#doctor-order-confirm-checkbox");
+  if (typeof window.showToast === "function") window.showToast("Sila tick pengesahan arahan Dr sebelum simpan.");
+  else alert("Sila tick pengesahan arahan Dr sebelum simpan.");
+  checkbox?.focus();
 }
 
 function injectConfirmation() {
@@ -30,7 +30,7 @@ function injectConfirmation() {
   if (!saveBar || document.querySelector("#doctor-order-confirm")) return;
   const block = document.createElement("div");
   block.id = "doctor-order-confirm";
-  block.className = "doctor-order-confirm required";
+  block.className = `doctor-order-confirm${confirmed ? "" : " required"}`;
   block.innerHTML = `
     <label><input id="doctor-order-confirm-checkbox" type="checkbox"><span>Saya sahkan prosedur yang dipilih dibuat atas arahan Dr.</span></label>
     <small>Wajib ditanda sebelum rekod prosedur boleh disimpan.</small>
@@ -41,44 +41,38 @@ function injectConfirmation() {
   checkbox.addEventListener("change", () => {
     confirmed = checkbox.checked;
     block.classList.toggle("required", !confirmed);
-    syncSaveButton();
   });
-  syncSaveButton();
 }
 
-function patchSaveFlow() {
-  if (patched || typeof window.handleSaveCase !== "function" || typeof window.saveCase !== "function") return;
-  patched = true;
-  const originalHandle = window.handleSaveCase;
+function patchSavedRecord() {
+  if (savePatched || typeof window.saveCase !== "function") return;
+  savePatched = true;
   const originalSave = window.saveCase;
-
-  window.handleSaveCase = function (...args) {
-    const checkbox = document.querySelector("#doctor-order-confirm-checkbox");
-    if (!checkbox?.checked) {
-      document.querySelector("#doctor-order-confirm")?.classList.add("required");
-      if (typeof window.showToast === "function") window.showToast("Sila tick pengesahan arahan Dr sebelum simpan.");
-      else alert("Sila tick pengesahan arahan Dr sebelum simpan.");
-      checkbox?.focus();
-      return;
-    }
-    confirmed = true;
-    return originalHandle.apply(this, args);
-  };
-
   window.saveCase = function (newCase, ...args) {
-    const record = { ...newCase, doctorInstructionConfirmed:true };
+    const record = { ...newCase, doctorInstructionConfirmed:Boolean(confirmed) };
     const result = originalSave.call(this, record, ...args);
     Promise.resolve(result).finally(() => { confirmed = false; });
     return result;
   };
 }
 
+// Capture phase memastikan inline onclick asal tidak sempat menyimpan jika checkbox belum ditanda.
+document.addEventListener("click", event => {
+  const save = event.target.closest?.("#save-btn");
+  if (!save) return;
+  const checkbox = document.querySelector("#doctor-order-confirm-checkbox");
+  if (!checkbox?.checked) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    warnRequired();
+  }
+}, true);
+
 const observer = new MutationObserver(() => {
-  patchSaveFlow();
+  patchSavedRecord();
   injectConfirmation();
-  syncSaveButton();
 });
 observer.observe(document.body, { childList:true, subtree:true });
-patchSaveFlow();
+patchSavedRecord();
 injectConfirmation();
 window.addEventListener("beforeunload", () => observer.disconnect());
