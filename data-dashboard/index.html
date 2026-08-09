@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
   <title>Dashboard Penerima · AMO Dashboard v2</title>
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./styles.css?v=4">
 </head>
 <body>
   <header class="topbar">
@@ -33,6 +33,26 @@
 
       <section class="summary" id="summary" aria-label="Ringkasan data"></section>
 
+      <section class="panel action-centre" aria-labelledby="actionTitle">
+        <div class="section-heading action-heading">
+          <div>
+            <p class="eyebrow">TINDAKAN PENYELIA</p>
+            <h2 id="actionTitle">Perlu pengesahan / diambil maklum</h2>
+            <p class="section-note">Semua tindakan PHC, GIRN dan notifikasi modul lain dipusatkan di sini.</p>
+          </div>
+          <strong id="actionCount" class="action-count">0</strong>
+        </div>
+        <div class="action-toolbar">
+          <label class="select-all"><input id="selectAllActions" type="checkbox"> <span>Pilih semua yang belum selesai</span></label>
+          <div class="action-buttons">
+            <button id="ackSelectedBtn" class="secondary" type="button" disabled>✓ Ambil maklum</button>
+            <button id="verifySelectedBtn" type="button" disabled>✓ Sahkan</button>
+          </div>
+        </div>
+        <p id="actionStatus" class="action-status" role="status"></p>
+        <div id="actionList" class="action-list"><p class="empty">Menunggu data tindakan…</p></div>
+      </section>
+
       <section class="recent panel" aria-labelledby="recentTitle">
         <div class="section-heading"><div><p class="eyebrow">TERKINI</p><h2 id="recentTitle">Aktiviti baru diterima</h2></div><small>Klik rekod untuk buka modul</small></div>
         <div id="recentList" class="recent-list"><p class="empty">Menunggu data…</p></div>
@@ -54,6 +74,6 @@
       </section>
     </div>
   </main>
-  <script type="module" src="./app.js?v=3"></script>
+  <script type="module" src="./app.js?v=4"></script>
 </body>
 </html>
