@@ -1,4 +1,4 @@
-const CACHE = "amo-dashboard-v2-firebase-4";
+const CACHE = "amo-dashboard-v2-firebase-5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -19,14 +19,15 @@ const ASSETS = [
   "./shared/firebase/users.js",
   "./shared/firebase/portal-auth.js?v=3",
   "./data-dashboard/",
-  "./data-dashboard/app.js?v=3",
-  "./data-dashboard/styles.css?v=3",
+  "./data-dashboard/app.js?v=5",
+  "./data-dashboard/styles.css?v=5",
   "./data-dashboard/modules/procedure.js",
   "./data-dashboard/modules/asthma.js",
   "./data-dashboard/modules/phc.js",
   "./data-dashboard/modules/girn.js",
   "./data-dashboard/modules/phc-findings.js",
   "./data-dashboard/modules/girn-findings.js",
+  "./data-dashboard/modules/supervisor-audit.js",
   "./manifest.json?v=4",
   "./icon-192.png?v=4",
   "./icon-512.png?v=4",

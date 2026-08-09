@@ -6,7 +6,7 @@ const repo=path.resolve(import.meta.dirname,"..");
 const read=file=>fs.readFileSync(path.join(repo,file),"utf8");
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 const branch=execFileSync("git",["branch","--show-current"],{cwd:repo,encoding:"utf8"}).trim();
-assert(branch==="firebase-v2","Pemeriksaan ini hanya boleh dijalankan pada branch firebase-v2.");
+assert(branch!=="main","Pemeriksaan perubahan mesti dijalankan pada branch kerja, bukan main.");
 execFileSync("git",["merge-base","--is-ancestor","origin/main","HEAD"],{cwd:repo});
 
 const required=["amo.html","asthma.html","phc-checklist/index.html","girn/index.html","shared/firebase/bootstrap.js","shared/firebase/legacy-adapter.js","data-dashboard/index.html","firestore.rules"];
@@ -20,7 +20,9 @@ assert(read("shared/firebase/auth.js").includes("browserLocalPersistence")&&read
 assert(read("amo-config.js").includes('environment: "firebase-v2"'),"Konfigurasi Prosedur bukan firebase-v2.");
 assert(read("shared/firebase/legacy-adapter.js").includes("doctorInstructionConfirmed !== true"),"Validasi arahan doktor belum dikuatkuasakan pada lapisan simpanan.");
 assert(read("firestore.rules").includes("request.resource.data.doctorInstructionConfirmed == true"),"Rules belum menolak rekod Prosedur tanpa arahan doktor.");
-assert(read("data-dashboard/app.js").includes("actionSources = [phc, phcFindings")&&read("data-dashboard/app.js").includes('recordType:"audit"'),"Pengesahan PHC atau jejak audit pusat belum lengkap.");
+assert(read("data-dashboard/app.js").includes("actionSources = [phcFindings")&&read("data-dashboard/app.js").includes('normalizedType(row) !== "note"'),"Restock PHC masih boleh masuk ke tindakan penyelia.");
+assert(read("data-dashboard/app.js").includes('sourceModule:"phc-daily"')&&read("data-dashboard/app.js").includes('actionType:"daily-verify"'),"Pengesahan PHC sekali sehari atau jejak auditnya belum lengkap.");
+assert(read("data-dashboard/app.js").includes("openPrintPreview")&&read("data-dashboard/index.html").includes("Print / Save as PDF"),"Print preview Dashboard Penerima belum lengkap.");
 assert(read("firestore.rules").includes("resource.data.recordType != 'audit'"),"Rules belum mengunci jejak audit penyelia.");
 assert(read("shared/firebase/bootstrap.js").includes('/\\/amo(?:\\.html)?$/')&&read("shared/firebase/bootstrap.js").includes('/\\/asthma(?:\\.html)?$/'),"Cloudflare extensionless routes belum memuatkan enhancement Prosedur/Asma.");
 assert(read("shared/firebase/auth.js").includes('prompt: "select_account"')&&read("index.html").includes("switchAccountBtn"),"Pemilih atau butang tukar akaun Google belum tersedia.");

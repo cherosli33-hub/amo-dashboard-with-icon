@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
   <title>Dashboard Penerima · AMO Dashboard v2</title>
-  <link rel="stylesheet" href="./styles.css?v=4">
+  <link rel="stylesheet" href="./styles.css?v=5">
 </head>
 <body>
-  <header class="topbar">
+  <header class="topbar no-print">
     <a href="../" aria-label="Kembali ke dashboard utama">←</a>
     <div class="title-block">
       <small>AMO Dashboard v2</small>
@@ -19,31 +19,71 @@
       <button id="logoutBtn" type="button">Log keluar</button>
     </div>
   </header>
+
   <main>
     <section id="gate" class="gate"><h2>Menyemak akses…</h2><p>Sesi Google yang sama digunakan untuk semua modul.</p></section>
     <div id="dashboard" hidden>
-      <section class="welcome">
-        <div>
-          <p class="eyebrow">PUSAT PENERIMAAN DATA</p>
-          <h2>Semua penghantaran dalam satu paparan</h2>
-          <p>Data Prosedur, Asma, PHC dan GIRN dipaparkan terus daripada Firebase.</p>
+      <section class="command-hero" aria-labelledby="pulseTitle">
+        <div class="hero-copy">
+          <p class="eyebrow">STATUS ETD HARI INI</p>
+          <h2 id="pulseTitle">Command Centre ETD</h2>
+          <p id="todayContext">Memuatkan status operasi…</p>
+        </div>
+        <div id="pulseCard" class="pulse-card is-loading">
+          <span class="pulse-orbit" aria-hidden="true"><i></i></span>
+          <div><small>ETD PULSE</small><strong id="pulseLabel">MENYEMAK</strong><span id="pulseDetail">Menunggu data langsung</span></div>
         </div>
         <div class="live-card"><span class="live-dot"></span><div><strong>Data langsung</strong><small id="lastUpdated">Menunggu sambungan…</small></div></div>
       </section>
 
-      <section class="summary" id="summary" aria-label="Ringkasan data"></section>
+      <section class="module-grid" id="moduleCards" aria-label="Status modul hari ini"></section>
 
-      <section class="panel action-centre" aria-labelledby="actionTitle">
-        <div class="section-heading action-heading">
+      <section class="overview-grid">
+        <section class="panel attention-panel" aria-labelledby="attentionTitle">
+          <div class="section-heading">
+            <div><p class="eyebrow">PERLU PERHATIAN</p><h2 id="attentionTitle">Perkara yang perlukan manusia</h2></div>
+            <strong id="attentionCount" class="attention-count">0</strong>
+          </div>
+          <div id="attentionList" class="attention-list"><p class="empty">Menunggu data…</p></div>
+        </section>
+
+        <section class="panel shift-panel" aria-labelledby="shiftTitle">
+          <div class="section-heading"><div><p class="eyebrow">3 SYIF</p><h2 id="shiftTitle">Kemajuan hari ini</h2></div></div>
+          <div id="shiftCards" class="shift-cards"></div>
+        </section>
+      </section>
+
+      <section class="overview-grid lower-grid">
+        <section class="panel activity-panel" aria-labelledby="activityTitle">
+          <div class="section-heading"><div><p class="eyebrow">AKTIVITI HARI INI</p><h2 id="activityTitle">Aliran terkini</h2></div><small>8 aktiviti terbaru</small></div>
+          <div id="recentList" class="timeline"><p class="empty">Menunggu data…</p></div>
+        </section>
+
+        <section class="panel trend-panel" aria-labelledby="trendTitle">
+          <div class="section-heading"><div><p class="eyebrow">7 HARI</p><h2 id="trendTitle">Ringkasan & trend</h2></div></div>
+          <div id="weekSummary" class="week-summary"></div>
+          <div id="weekTrend" class="week-trend" aria-label="Trend jumlah rekod tujuh hari"></div>
+        </section>
+      </section>
+
+      <section id="supervisorCentre" class="panel supervisor-centre" aria-labelledby="supervisorTitle" hidden>
+        <div class="section-heading supervisor-heading">
           <div>
-            <p class="eyebrow">TINDAKAN PENYELIA</p>
-            <h2 id="actionTitle">Perlu pengesahan / diambil maklum</h2>
-            <p class="section-note">Semua tindakan PHC, GIRN dan notifikasi modul lain dipusatkan di sini.</p>
+            <p class="eyebrow">SUPERVISOR CENTRE</p>
+            <h2 id="supervisorTitle">Pengesahan & tindakan penyelia</h2>
+            <p class="section-note">Restock kekal di modul PHC. Di sini hanya pengesahan PHC sekali sehari, Tindakan Catatan dan isu modul lain.</p>
           </div>
           <strong id="actionCount" class="action-count">0</strong>
         </div>
+
+        <article id="phcDailyCard" class="daily-verification">
+          <div class="daily-icon" aria-hidden="true">PHC</div>
+          <div class="daily-copy"><small>PENGESAHAN HARIAN</small><strong id="phcDailyTitle">Menunggu rekod PHC…</strong><span id="phcDailyDetail">Pengesahan dibuat sekali untuk keseluruhan hari.</span></div>
+          <button id="verifyPhcDayBtn" type="button" disabled>Sahkan hari ini</button>
+        </article>
+
         <div class="action-toolbar">
-          <label class="select-all"><input id="selectAllActions" type="checkbox"> <span>Pilih semua yang belum selesai</span></label>
+          <label class="select-all"><input id="selectAllActions" type="checkbox"> <span>Pilih semua tindakan tertunggak</span></label>
           <div class="action-buttons">
             <button id="ackSelectedBtn" class="secondary" type="button" disabled>✓ Ambil maklum</button>
             <button id="verifySelectedBtn" type="button" disabled>✓ Sahkan</button>
@@ -53,17 +93,15 @@
         <div id="actionList" class="action-list"><p class="empty">Menunggu data tindakan…</p></div>
       </section>
 
-      <section class="recent panel" aria-labelledby="recentTitle">
-        <div class="section-heading"><div><p class="eyebrow">TERKINI</p><h2 id="recentTitle">Aktiviti baru diterima</h2></div><small>Klik rekod untuk buka modul</small></div>
-        <div id="recentList" class="recent-list"><p class="empty">Menunggu data…</p></div>
-      </section>
-
       <section class="panel data-panel">
         <div class="toolbar">
           <nav id="tabs" aria-label="Jenis data"></nav>
-          <button id="csvBtn" class="secondary" type="button">Eksport CSV</button>
+          <div class="export-actions">
+            <button id="printPreviewBtn" type="button">Cetak / PDF</button>
+            <button id="csvBtn" class="secondary" type="button">Eksport CSV</button>
+          </div>
         </div>
-        <div class="filters" aria-label="Tapisan rekod">
+        <div class="filters no-print" aria-label="Tapisan rekod">
           <label class="search-field"><span>Cari</span><input id="searchInput" type="search" placeholder="Nama, ID, syif, status…"></label>
           <label><span>Dari tarikh</span><input id="fromDate" type="date"></label>
           <label><span>Hingga tarikh</span><input id="toDate" type="date"></label>
@@ -74,6 +112,17 @@
       </section>
     </div>
   </main>
-  <script type="module" src="./app.js?v=4"></script>
+
+  <dialog id="printDialog" class="print-dialog">
+    <div class="preview-shell">
+      <div class="preview-toolbar no-print">
+        <div><strong>Print Preview</strong><small id="previewHint">Semak laporan sebelum mencetak.</small></div>
+        <div><button id="closePreviewBtn" class="ghost" type="button">Tutup</button><button id="printBtn" type="button">Print / Save as PDF</button></div>
+      </div>
+      <article id="printReport" class="print-report" aria-label="Laporan untuk cetakan"></article>
+    </div>
+  </dialog>
+
+  <script type="module" src="./app.js?v=5"></script>
 </body>
 </html>
