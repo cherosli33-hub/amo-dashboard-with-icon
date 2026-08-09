@@ -4,7 +4,7 @@ const ASSETS = [
   "./index.html",
   "./asthma.html",
   "./amo.html",
-  "./amo-config.js",
+  "./amo-config.js?v=2",
   "./styles.css?v=21",
   "./config.js?v=7",
   "./pefr.mjs",

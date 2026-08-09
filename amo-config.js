@@ -29,6 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Bersihkan juga jika service worker lama sempat memuatkan enhancement v2
+  // selepas borang dirender. Ini membolehkan klien lama pulih tanpa reset cache.
+  const confirmationObserver = new MutationObserver(cleanConfirmationCheckbox);
+  confirmationObserver.observe(document.body, { childList:true, subtree:true });
+  cleanConfirmationCheckbox();
+  window.addEventListener("beforeunload", () => confirmationObserver.disconnect());
+
   if (typeof renderNewCase === "function") {
     const baseRenderNewCase = renderNewCase;
     renderNewCase = function () {
