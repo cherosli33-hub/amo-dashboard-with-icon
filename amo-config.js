@@ -10,15 +10,8 @@ window.AMO_CONFIG = Object.freeze({
 // remains untouched while validation/report behaviour can evolve safely.
 document.addEventListener("DOMContentLoaded", () => {
   const normalized = value => String(value || "").trim().toLowerCase().replace(/[’‘]/g, "'");
-  const secondaryExempt = new Set([
-    "vital sign", "vital signs", "dressing", "cbd", "change cbd",
-    "ryle's tube", "ryle tube", "ryles tube", "ryls tube",
-    "change ryle's tube", "change ryle tube", "change ryles tube", "change ryls tube"
-  ]);
-
   function doctorRequired(name, zone) {
     const procedure = normalized(name);
-    if (zone === "secondary_triage" && secondaryExempt.has(procedure)) return false;
     if ((zone === "yellow_zone" || zone === "red_zone") && procedure === "ambulance call") return false;
     return true;
   }
