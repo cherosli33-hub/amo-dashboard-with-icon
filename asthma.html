@@ -3,180 +3,51 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#087f73">
-  <meta name="description" content="Dashboard Penilaian PEFR Pesakit Asma ETD Lepeh">
-  <title>Penilaian Asma · A.M.O ETD LEPEH</title>
-  <link rel="manifest" href="./manifest.json?v=4">
-  <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=4">
-  <link rel="icon" type="image/png" href="./favicon.png?v=4">
-  <link rel="stylesheet" href="./styles.css?v=21">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#123f35">
+  <title>AMO Dashboard Versi Lama Telah Ditutup</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; color: #17362f; background: linear-gradient(145deg, #edf8f4 0%, #f8fbfa 48%, #e5f2ed 100%); }
+    main { width: min(100%, 680px); padding: clamp(28px, 6vw, 54px); border: 1px solid rgba(18, 88, 69, .14); border-radius: 28px; background: rgba(255,255,255,.95); box-shadow: 0 24px 70px rgba(19, 68, 55, .14); }
+    .status { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 8px 12px; border-radius: 999px; color: #8a342d; background: #fff0ed; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .status::before { width: 8px; height: 8px; border-radius: 50%; background: #c9574d; content: ""; }
+    h1 { max-width: 560px; margin: 0 0 20px; color: #123f35; font-size: clamp(30px, 7vw, 48px); line-height: 1.04; letter-spacing: -.035em; }
+    p { margin: 0 0 16px; color: #49665e; font-size: clamp(16px, 3.4vw, 18px); line-height: 1.65; }
+    .new-version { margin: 28px 0 12px; color: #17362f; font-weight: 800; }
+    .url { display: block; margin-bottom: 20px; overflow-wrap: anywhere; color: #087657; font-weight: 700; }
+    .button { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; margin: 10px 0 22px; padding: 14px 22px; border-radius: 15px; color: #fff; background: #087657; box-shadow: 0 12px 28px rgba(8, 118, 87, .22); font-size: 17px; font-weight: 800; text-decoration: none; }
+    .button:hover { background: #075f48; }
+    .button:focus-visible { outline: 4px solid rgba(8, 118, 87, .25); outline-offset: 3px; }
+    .footer { margin-bottom: 0; padding-top: 20px; border-top: 1px solid #deebe6; font-size: 15px; }
+  </style>
 </head>
 <body>
-  <header class="app-header">
-    <div class="app-header-inner">
-      <a class="back-link" href="./" aria-label="Kembali ke portal">‹</a>
-      <div class="app-title"><strong>Penilaian Pesakit Asma</strong><small>PEFR · ETD Lepeh</small></div>
-      <img class="app-mark" src="./icon-192.png?v=4" alt="">
-    </div>
-  </header>
+  <main>
+    <div class="status">Versi lama ditutup</div>
+    <h1>AMO DASHBOARD VERSI LAMA TELAH DITUTUP</h1>
 
-  <main class="app-shell">
-    <div class="notice">Alat ini membantu pengiraan dan dokumentasi PEFR. Keputusan klinikal serta uptriage kekal berdasarkan penilaian PPP/pegawai perubatan.</div>
-    <div id="syncNotice" class="notice sync-notice" hidden></div>
+    <p>Penghantaran maklumat melalui versi ini telah dihentikan.</p>
 
-    <section id="newView" class="view is-active" aria-labelledby="newTitle">
-      <div class="section-heading"><h1 id="newTitle">Penilaian baharu</h1><p>Lengkapkan maklumat, PEFR sebelum dan PEFR selepas.</p></div>
-      <form id="assessmentForm" novalidate>
-        <section class="card">
-          <h2><span class="step">1</span>Kategori & maklumat pesakit</h2>
-          <div class="field full">
-            <span class="fieldset-label">Kategori pesakit</span>
-            <div class="segmented">
-              <label><input type="radio" name="patientType" value="adult" checked><span>Dewasa</span></label>
-              <label><input type="radio" name="patientType" value="paediatric"><span>Pediatrik (0–14 tahun)</span></label>
-            </div>
-          </div>
-          <div class="form-grid" style="margin-top:13px">
-            <div class="field full"><label for="patientName">Nama pesakit <small>(pilihan)</small></label><input id="patientName" name="patientName" list="patientNameSuggestions" autocomplete="off" maxlength="80"><datalist id="patientNameSuggestions"></datalist></div>
-            <div class="field full"><label for="patientId">No. IC / RN</label><input id="patientId" name="patientId" list="patientIdSuggestions" required autocomplete="off" maxlength="40"><datalist id="patientIdSuggestions"></datalist></div>
-            <div class="field"><label for="age">Umur</label><div class="unit-field"><input id="age" name="age" type="number" min="15" max="85" step="1" required><span class="unit">tahun</span></div><small id="ageHelp">Formula dewasa sah untuk umur 15–85 tahun.</small></div>
-            <div class="field"><label for="sex">Jantina</label><select id="sex" name="sex" required><option value="">Pilih</option><option value="male">Lelaki</option><option value="female">Perempuan</option></select></div>
-            <div class="field full" id="adultHeightField"><label for="heightAdult">Tinggi</label><div class="unit-field"><input id="heightAdult" name="heightAdult" type="number" min="120" max="210" step="1" required><span class="unit">cm</span></div></div>
-            <div class="field full" id="paediatricHeightField" hidden><label for="heightPaediatric">Tinggi rujukan pediatrik</label><select id="heightPaediatric" name="heightPaediatric"><option value="">Pilih tinggi</option></select><small>Nilai tepat daripada jadual EU/EN13826; tiada interpolasi.</small></div>
-            <div class="field full">
-              <label>Tarikh & masa penilaian</label>
-              <div class="datetime-toggle" role="group" aria-label="Pilihan tarikh">
-                <button type="button" id="dtToday" class="dt-opt active">Hari ini</button>
-                <button type="button" id="dtOther" class="dt-opt">Tarikh lain</button>
-              </div>
-              <div class="datetime-auto" id="dtAuto"><input id="displayDate" disabled><input id="displayTime" disabled></div>
-              <div class="datetime-custom" id="dtCustom" hidden>
-                <input type="date" id="customDate" aria-label="Pilih tarikh">
-                <input type="time" id="customTime" aria-label="Pilih masa">
-                <small class="dt-note">Hanya dalam tempoh 7 hari lepas dibenarkan. Tarikh hadapan tidak dibenarkan.</small>
-              </div>
-            </div>
-          </div>
-        </section>
+    <p>AMO Dashboard v2 kini menggunakan Firebase sebagai sistem penyimpanan data dan ditempatkan pada platform baharu. Versi lama pula menggunakan Google Apps Script, Google Sheets dan GitHub Pages.</p>
 
-        <section class="card">
-          <h2><span class="step">2</span>Vital signs</h2>
-          <div class="form-grid">
-            <div class="field"><label for="bpSys">BP systolic</label><div class="unit-field"><input id="bpSys" name="bpSys" type="number" min="40" max="300" inputmode="numeric"><span class="unit">mmHg</span></div></div>
-            <div class="field"><label for="bpDia">BP diastolic</label><div class="unit-field"><input id="bpDia" name="bpDia" type="number" min="20" max="200" inputmode="numeric"><span class="unit">mmHg</span></div></div>
-            <div class="field"><label for="hr">HR</label><div class="unit-field"><input id="hr" name="hr" type="number" min="20" max="250"><span class="unit">bpm</span></div></div>
-            <div class="field"><label for="rr">RR</label><div class="unit-field"><input id="rr" name="rr" type="number" min="5" max="100"><span class="unit">/min</span></div></div>
-            <div class="field"><label for="temperature">Temperature</label><div class="unit-field"><input id="temperature" name="temperature" type="number" min="30" max="45" step="0.1"><span class="unit">°C</span></div></div>
-            <div class="field"><label for="spo2">SpO₂</label><div class="unit-field"><input id="spo2" name="spo2" type="number" min="40" max="100"><span class="unit">%</span></div></div>
-          </div>
-        </section>
+    <p>Disebabkan perubahan teknologi serta lokasi sistem tersebut, versi baharu tidak dapat menggunakan pautan lama.</p>
 
-        <section class="card">
-          <h2><span class="step">3</span>Penilaian PEFR</h2>
-          <div class="ideal-card" aria-live="polite"><div><small>PEFR IDEAL / PREDICTED</small><strong id="idealValue">— L/min</strong></div><div id="idealMethod" class="ideal-method">Lengkapkan umur, jantina dan tinggi.</div></div>
-          <div class="form-grid" style="margin-top:14px">
-            <div class="field"><label for="pefrBefore">PEFR Before</label><div class="unit-field"><input id="pefrBefore" name="pefrBefore" type="number" min="1" max="900" inputmode="numeric" required><span class="unit">L/min</span></div></div>
-            <div class="field"><label for="pefrAfter">PEFR After</label><div class="unit-field"><input id="pefrAfter" name="pefrAfter" type="number" min="1" max="900" inputmode="numeric" required><span class="unit">L/min</span></div></div>
-          </div>
-          <div class="result-grid" aria-live="polite">
-            <article class="result-card"><small>PEFR Before</small><div id="beforePercent" class="result-value">—%</div><span id="beforeCategory" class="category-badge category-empty">Belum dikira</span></article>
-            <article class="result-card"><small>PEFR After</small><div id="afterPercent" class="result-value">—%</div><span id="afterCategory" class="category-badge category-empty">Belum dikira</span></article>
-          </div>
-        </section>
+    <p class="new-version">Sila gunakan AMO Dashboard v2:</p>
+    <a class="url" href="https://amo-dashboard-v2.pages.dev/">https://amo-dashboard-v2.pages.dev/</a>
 
-        <section class="card">
-          <h2><span class="step">4</span>PEFR Not Done <small>(jika berkaitan)</small></h2>
-          <label class="checkbox-row"><input id="pefrNotDone" name="pefrNotDone" type="checkbox"><span><strong>PEFR tidak dapat dilakukan</strong><small>Tandakan jika tiada bacaan PEFR Before/After.</small></span></label>
-          <div id="notDoneReasons" hidden>
-            <p class="fieldset-label" style="margin:16px 0 9px">Sebab PEFR tidak dilakukan</p>
-            <div class="option-list">
-              <label><input type="radio" name="notDoneReason" value="Patient Refused / Uncooperative"><span><b>1</b> Patient Refused / Uncooperative</span></label>
-              <label><input type="radio" name="notDoneReason" value="Severe Asthma"><span><b>2</b> Severe Asthma</span></label>
-              <label><input type="radio" name="notDoneReason" value="Unable (patient factor / poor technique)"><span><b>3</b> Unable <small>(patient factor / poor technique)</small></span></label>
-              <label><input type="radio" name="notDoneReason" value="Others"><span><b>4</b> Others (Specify)</span></label>
-            </div>
-            <div id="notDoneOtherField" class="field" style="margin-top:10px" hidden><label for="notDoneOther">Nyatakan sebab lain</label><input id="notDoneOther" name="notDoneOther" maxlength="160"></div>
-          </div>
-        </section>
+    <a class="button" href="https://amo-dashboard-v2.pages.dev/">Buka AMO Dashboard v2</a>
 
-        <section id="uptriageCard" class="card uptriage-card" hidden>
-          <h2><span class="step">5</span>Uptriage oleh PPP</h2>
-          <p style="margin:-5px 0 14px;color:var(--muted);font-size:.83rem">Pilih berdasarkan penilaian klinikal. Sistem tidak mencadangkan zon.</p>
-          <div class="segmented three"><label><input type="radio" name="uptriage" value="None" checked><span>Tiada</span></label><label><input type="radio" name="uptriage" value="Yellow Zone"><span>Yellow Zone</span></label><label><input type="radio" name="uptriage" value="Red Zone"><span>Red Zone</span></label></div>
-        </section>
-
-        <section id="summaryCard" class="card summary-card" hidden>
-          <h2><span class="step">6</span>Ringkasan sebelum simpan</h2>
-          <dl id="summaryList" class="summary-list"></dl>
-          <div class="field" style="margin-top:16px"><label for="pppName">Nama PPP</label><input id="pppName" name="pppName" autocomplete="name" maxlength="80" required placeholder="Masukkan nama PPP"></div>
-          <div class="actions"><button id="resetButton" class="btn btn-secondary" type="button">Kosongkan</button><button id="saveButton" class="btn btn-primary" type="submit">Simpan Rekod</button></div>
-        </section>
-      </form>
-    </section>
-
-    <section id="todayView" class="view" aria-labelledby="todayTitle">
-      <div class="section-heading"><h2 id="todayTitle">Penilaian hari ini</h2><p>Rekod bersama daripada Google Sheet untuk semua peranti.</p></div>
-      <div class="filter-row record-search-row"><input id="recordSearch" type="search" placeholder="Cari IC / RN"><button id="searchRecords" class="btn btn-primary" type="button">Cari</button><button id="refreshRecords" class="btn btn-secondary" type="button">Muat semula</button></div>
-      <div id="recordList" class="record-list"></div>
-    </section>
-
-    <section id="patientLookupView" class="view" aria-labelledby="patientLookupTitle">
-      <div class="section-heading"><h2 id="patientLookupTitle">Semakan pesakit</h2><p>Cari maklumat daripada rekod penilaian Asma yang paling terkini.</p></div>
-      <div class="filter-row"><input id="patientLookupId" type="search" placeholder="Masukkan No. IC / RN" maxlength="40" autocomplete="off"><button id="patientLookupButton" class="btn btn-primary" type="button">Cari Pesakit</button></div>
-      <p class="lookup-privacy-note">Carian hanya bermula selepas butang ditekan. Gunakan No. IC/RN yang tepat.</p>
-      <div id="patientLookupResult" aria-live="polite"><div class="empty-state">Masukkan No. IC/RN untuk membuat semakan.</div></div>
-    </section>
-
-    <section id="statsView" class="view" aria-labelledby="statsTitle">
-      <div class="section-heading"><h2 id="statsTitle">Statistik PEFR</h2><p>Ringkasan bersama daripada Google Sheet.</p></div>
-      <div class="filter-row"><select id="statsRange"><option value="today">Hari ini</option><option value="yesterday">Semalam</option><option value="week">Minggu ini</option><option value="month">Bulan ini</option><option value="all">Semua</option></select><button id="refreshStats" class="btn btn-secondary" type="button">Muat semula</button></div>
-      <div id="statsGrid" class="stats-grid"></div>
-      <div class="card stat-section"><h3>Kategori Before</h3><div id="beforeBars"></div></div>
-      <div class="card stat-section"><h3>Kategori After</h3><div id="afterBars"></div></div>
-
-      <section class="card pefr-report-builder no-print">
-        <div class="report-builder-head">
-          <div><p class="eyebrow-inline">LAPORAN AUDIT</p><h3>Laporan PEFR A4</h3><p>Data hanya diminta daripada Google Sheet selepas butang Jana Laporan ditekan.</p></div>
-          <span class="report-version">Asma v1.1</span>
-        </div>
-        <div class="report-filter-grid">
-          <div class="field"><label for="reportPeriodType">Tempoh</label><select id="reportPeriodType"><option value="week">Mingguan</option><option value="month" selected>Bulanan</option></select></div>
-          <div class="field" id="reportWeekField" hidden><label for="reportWeekDate">Tarikh dalam minggu</label><input id="reportWeekDate" type="date"></div>
-          <div class="field" id="reportMonthField"><label for="reportMonth">Bulan</label><input id="reportMonth" type="month"></div>
-          <div class="field"><label for="reportShift">Syif</label><select id="reportShift"><option value="all">Semua syif</option><option value="Pagi">Pagi (07:00–14:00)</option><option value="Petang">Petang (14:00–21:00)</option><option value="Malam">Malam (21:00–07:00)</option></select></div>
-          <div class="field"><label for="reportStatus">Rekod dalam senarai</label><select id="reportStatus"><option value="all">Semua rekod</option><option value="complete">Before + After lengkap</option><option value="notDone">PEFR Not Done</option><option value="uptriage">Kes uptriage</option></select></div>
-        </div>
-        <button id="generatePefrReport" class="btn btn-primary report-generate" type="button">Jana Laporan A4</button>
-        <p id="reportLoadStatus" class="report-load-status" aria-live="polite"></p>
-      </section>
-
-      <section id="pefrReportPreview" class="pefr-preview-shell" hidden>
-        <div class="preview-toolbar no-print"><div><strong>Pratonton A4 Landscape</strong><small id="reportPageHint">Senarai panjang akan bersambung ke muka surat seterusnya.</small></div><button id="printPefrReport" class="btn btn-primary" type="button">Cetak / Simpan PDF</button></div>
-        <article id="pefrPrintReport" class="pefr-print-report">
-          <header class="print-report-head"><div class="print-mark">ETD</div><div><small>KEMENTERIAN KESIHATAN MALAYSIA</small><h2 id="printReportTitle">LAPORAN BULANAN PENILAIAN PEFR ASMA</h2><p>Jabatan Kecemasan dan Trauma · Hospital Kuala Lipis</p></div><dl><dt>Tempoh</dt><dd id="printReportPeriod">—</dd><dt>Syif</dt><dd id="printReportShift">Semua syif</dd><dt>Jumlah rekod</dt><dd id="printReportTotal">0</dd></dl></header>
-          <div class="print-kpi-grid" id="printKpiGrid"></div>
-          <section class="print-analysis"><h3>Analisis pelaksanaan dan hasil PEFR</h3><div id="printAnalysisGrid" class="print-analysis-grid"></div></section>
-          <section class="print-detail"><h3>Senarai bukti penilaian PEFR</h3><div class="print-table-wrap"><table><thead><tr><th>Tarikh / Masa</th><th>IC / RN</th><th>Pesakit</th><th>Umur / Jantina</th><th>Vital Signs</th><th>PEFR Ideal</th><th>PEFR Before</th><th>PEFR After</th><th>Perubahan</th><th>Uptriage / PEFR Not Done</th><th>Nama PPP</th></tr></thead><tbody id="printReportRows"></tbody></table></div></section>
-          <section class="print-summary"><div><h3>Rumusan audit</h3><p id="printAuditSummary"></p></div><div class="print-signatures"><p>Disediakan oleh<br><br>Nama / Tandatangan:</p><p>Disemak oleh<br><br>Nama / Tandatangan:</p></div></section>
-          <footer>Laporan dijana melalui Asthma Dashboard · E.T.D Hospital Kuala Lipis · Asma v1.1</footer>
-        </article>
-      </section>
-    </section>
-
-    <section id="referenceView" class="view" aria-labelledby="referenceTitle">
-      <div class="section-heading"><h2 id="referenceTitle">Rujukan klinikal</h2><p>Tekan gambar untuk paparan skrin penuh dan zum.</p></div>
-      <div class="reference-grid">
-        <button class="reference-card" type="button" data-image="./references/adult-pefr-chart.jpeg" data-title="Carta PEFR Dewasa"><img src="./references/adult-pefr-chart.jpeg" alt="Carta PEFR dewasa"><strong>Carta PEFR Dewasa</strong><small>EU/EN13826</small></button>
-        <button class="reference-card" type="button" data-image="./references/paediatric-pefr-table.jpeg" data-title="Jadual PEFR Pediatrik"><img src="./references/paediatric-pefr-table.jpeg" alt="Jadual PEFR pediatrik"><strong>Jadual PEFR Pediatrik</strong><small>Berdasarkan tinggi</small></button>
-        <button class="reference-card" type="button" data-image="./references/pefr-interpretation.jpeg" data-title="Interpretasi PEFR"><img src="./references/pefr-interpretation.jpeg" alt="Carta interpretasi PEFR"><strong>Interpretasi PEFR</strong><small>Mild · Moderate · Severe</small></button>
-      </div>
-    </section>
+    <p class="footer">Sila kemas kini bookmark atau pasang versi baharu pada skrin utama telefon anda.</p>
   </main>
-
-  <nav class="bottom-nav" aria-label="Menu dashboard"><button class="nav-button is-active" data-view="newView"><span>＋</span>Penilaian</button><button class="nav-button" data-view="todayView"><span>▤</span>Hari ini</button><button class="nav-button" data-view="patientLookupView"><span>⌕</span>Semakan</button><button class="nav-button" data-view="statsView"><span>▥</span>Statistik</button><button class="nav-button" data-view="referenceView"><span>▣</span>Rujukan</button></nav>
-  <dialog id="referenceDialog" class="reference-dialog"><div class="dialog-head"><strong id="dialogTitle">Rujukan</strong><button id="dialogClose" class="dialog-close" type="button" aria-label="Tutup">×</button></div><div class="dialog-image-wrap"><img id="dialogImage" alt=""></div></dialog>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="./config.js?v=7"></script>
-  <script type="module" src="./asthma.mjs?v=14"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/amo-dashboard-with-icon/service-worker.js", {
+        scope: "/amo-dashboard-with-icon/",
+        updateViaCache: "none"
+      }).then(registration => registration.update()).catch(() => {});
+    }
+  </script>
 </body>
 </html>
