@@ -98,11 +98,21 @@ async function sendInspection(record){
 export async function saveInspection(record){
     const prepared={...record,appVersion:APP_VERSION,syncStatus:"PENDING"};
     upsertLocalRecord(prepared); saveLatestInventory(prepared); queueInspection(prepared);
-    if(prepared.notes){
-          const cached=loadFindings().filter(finding=>finding.id!==`${prepared.id}-NOTE`);
-          cached.unshift({id:`${prepared.id}-NOTE`,inspectionId:prepared.id,date:prepared.date,bagShift:`${prepared.bag} / ${prepared.shift}`,note:prepared.notes,action:"",actionAt:"",status:"Belum diambil tindakan"});
-          saveFindings(cached);
-    }
+    const shortages=Object.values(prepared.quantities||{}).flatMap(category=>category.items||[])
+          .filter(item=>Number(item.qty)<Number(item.standard));
+    const localFindings=shortages.map((item,index)=>({
+          type:"shortage",id:`${prepared.id}-F${String(index+1).padStart(3,"0")}`,
+          inspectionId:prepared.id,date:prepared.date,bagShift:`${prepared.bag} / ${prepared.shift}`,
+          item:item.name,qty:Number(item.qty),standard:Number(item.standard),note:"",action:"",actionAt:"",
+          status:"Belum diambil tindakan",localPending:true,
+    }));
+    if(prepared.notes) localFindings.push({
+          type:"note",id:`${prepared.id}-NOTE`,inspectionId:prepared.id,date:prepared.date,
+          bagShift:`${prepared.bag} / ${prepared.shift}`,item:"",qty:null,standard:null,
+          note:prepared.notes,action:"",actionAt:"",status:"Belum diambil tindakan",localPending:true,
+    });
+    const cached=loadFindings().filter(finding=>finding.inspectionId!==prepared.id);
+    saveFindings([...localFindings,...cached]);
     if(configured() && navigator.onLine) syncPendingInspections().catch(()=>{});
     return {record:prepared,synced:false,message:"Rekod disimpan. Sync Firebase berjalan di belakang."};
 }
