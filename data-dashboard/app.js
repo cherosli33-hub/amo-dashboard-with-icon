@@ -151,10 +151,15 @@ function renderModuleCards() {
   const issues = issueCounts();
   const procedureRows = todayRows(procedure);
   const procedureTotal = procedureRows.reduce((sum, row) => sum + procedureNames(row).length, 0);
+  const procedurePatients = new Set(procedureRows.map(row => {
+    const id = String(row.registrationNumber || row.patientId || row.id || "").trim().toUpperCase();
+    const shift = String(row.shift || "").trim().toLowerCase();
+    return id ? `${id}|${shift}` : "";
+  }).filter(Boolean)).size;
   const phcShifts = new Set(todayRows(phc).map(row => shiftId(row.shift)).filter(Boolean));
   const girnShifts = new Set(todayRows(girn).map(row => shiftId(row.shift)).filter(Boolean));
   const cards = [
-    { module:procedure, value:procedureTotal, label:"prosedur hari ini", note:`${procedureRows.length} log kes diterima`, tone:"blue" },
+    { module:procedure, value:procedurePatients, label:"pesakit hari ini", note:`${procedureTotal} prosedur direkod`, tone:"blue" },
     { module:asthma, value:todayRows(asthma).length, label:"penilaian hari ini", note:issues.severeAsthma.length || issues.incompleteAsthma.length ? `${issues.severeAsthma.length + issues.incompleteAsthma.length} perlu perhatian` : "Semua rekod stabil", tone:"amber" },
     { module:phc, value:`${phcShifts.size}/3`, label:"syif direkod", note:issues.phcNotes.length ? `${issues.phcNotes.length} Tindakan Catatan` : "Tiada catatan tertunggak", tone:"green" },
     { module:girn, value:`${girnShifts.size}/3`, label:"syif diperiksa", note:issues.girnIssues.length ? `${issues.girnIssues.length} isu ditemui` : "Tiada isu tertunggak", tone:"purple" }
