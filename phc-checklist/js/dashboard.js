@@ -26,9 +26,9 @@ function noteFinding(record){ return {id:`${record.id}-NOTE`,inspectionId:record
 function mergeFindings(remoteFindings,sourceRecords=[],remoteIsAuthoritative=true){
   const base=remoteIsAuthoritative?(remoteFindings||[]):loadFindings();
   const merged=new Map(base.map(finding=>[finding.id,finding]));
-  const pendingIds=new Set(loadPendingSync().filter(record=>record.notes).map(record=>`${record.id}-NOTE`));
-  loadFindings().filter(finding=>pendingIds.has(finding.id)).forEach(finding=>{ if(!merged.has(finding.id)) merged.set(finding.id,finding); });
-  sourceRecords.filter(record=>record.notes&&(!remoteIsAuthoritative||pendingIds.has(`${record.id}-NOTE`))).forEach(record=>{ const local=noteFinding(record); if(!merged.has(local.id)) merged.set(local.id,local); });
+  const pendingRecordIds=new Set(loadPendingSync().map(record=>record.id));
+  loadFindings().filter(finding=>pendingRecordIds.has(finding.inspectionId)).forEach(finding=>{ if(!merged.has(finding.id)) merged.set(finding.id,finding); });
+  sourceRecords.filter(record=>record.notes&&(!remoteIsAuthoritative||pendingRecordIds.has(record.id))).forEach(record=>{ const local=noteFinding(record); if(!merged.has(local.id)) merged.set(local.id,local); });
   return [...merged.values()];
 }
 
