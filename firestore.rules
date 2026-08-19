@@ -54,14 +54,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /phc_inspections/{documentId} {
-      allow read, create: if signedIn();
-      // Pengguna biasa boleh mengemas kini rekod operasi, tetapi medan
-      // pengesahan penyelia hanya boleh ditulis oleh role supervisor/admin.
-      allow update: if staff()
-        || (signedIn()
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'verified', 'verifiedBy', 'verifiedEmail', 'verifiedAt'
-          ]));
+      allow read, create, update: if signedIn();
       allow delete: if false;
     }
     match /girn_inspections/{documentId} {
