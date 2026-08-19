@@ -1,4 +1,4 @@
-import { SHIFTS, formatDate, getWeekDays, isoDate, loadFindings, loadLatestInventory, loadPendingSync, loadRecords, loadRestockActions, reconcileRemoteRecords, recordLowItems, saveFindings, saveLatestInventory, saveRestockAction } from "./app.js";
+import { SHIFTS, formatDate, getWeekDays, isoDate, loadFindings, loadLatestInventory, loadPendingSync, loadRecords, loadRestockActions, reconcileRemoteRecords, recordLowItems, saveFindings, saveLatestInventory, savePendingSync, saveRestockAction } from "./app.js";
 import { apiConfigured, fetchDashboard, syncPendingInspections, syncPendingRestockActions } from "./api.js";
 
 const content=document.querySelector("#dashboardContent");
@@ -30,6 +30,21 @@ function mergeFindings(remoteFindings,sourceRecords=[],remoteIsAuthoritative=tru
   loadFindings().filter(finding=>pendingRecordIds.has(finding.inspectionId)).forEach(finding=>{ if(!merged.has(finding.id)) merged.set(finding.id,finding); });
   sourceRecords.filter(record=>record.notes&&(!remoteIsAuthoritative||pendingRecordIds.has(record.id))).forEach(record=>{ const local=noteFinding(record); if(!merged.has(local.id)) merged.set(local.id,local); });
   return [...merged.values()];
+}
+
+function reconcileConfirmedPending(remoteRecords,remoteFindings){
+  const pending=loadPendingSync();
+  if(!pending.length) return;
+  const confirmed=pending.filter(record=>{
+    if(!remoteRecords.some(remote=>remote.id===record.id)) return false;
+    const shortages=recordLowItems(record);
+    const shortagesReady=shortages.every(item=>remoteFindings.some(finding=>finding.type==="shortage"&&finding.inspectionId===record.id&&finding.item===item.name));
+    const noteReady=!record.notes||remoteFindings.some(finding=>finding.id===`${record.id}-NOTE`);
+    return shortagesReady&&noteReady;
+  });
+  if(!confirmed.length) return;
+  const confirmedIds=new Set(confirmed.map(record=>record.id));
+  savePendingSync(pending.filter(record=>!confirmedIds.has(record.id)));
 }
 
 function shortageFinding(record,item){
@@ -67,10 +82,8 @@ function render(){
   const actions=loadRestockActions();
   const lowItems=currentLowItems();
   const pendingNotes=findings.filter(finding=>finding.type!=="shortage"&&finding.note&&finding.status==="Belum diambil tindakan"&&!actions[noteActionKey(finding)]);
-  const pending=loadPendingSync().length;
   const bagCard=bag=>`<article class="card bag-card"><div class="bag-title"><span class="bag-badge">\u25a3</span><h3>Beg ${bag}</h3></div><div class="shift-list">${SHIFTS.map(shift=>`<div class="shift-row"><span>${shift}</span>${statusIcon(completed.has(`${bag}-${shift}`))}</div>`).join("")}</div></article>`;
   content.innerHTML=`
-    ${pending||connectionMessage?`<div class="connection-banner ${pending?"pending":"info"}"><strong>${pending?`${pending} rekod menunggu sync`:"Status sambungan"}</strong><span>${esc(connectionMessage||"Rekod akan dihantar semula apabila internet tersedia.")}</span></div>`:""}
     <section class="date-line"><div><p class="eyebrow">HARI INI</p><h1>${formatDate(now,{weekday:"long",day:"numeric",month:"long"})}</h1></div><span class="live-time" id="liveTime"></span></section>
     <section class="card next-card"><span class="label">TINDAKAN SETERUSNYA</span>${next?`<h2>${next.replace("-"," \u00b7 Shift ")}</h2><p>Pemeriksaan ini masih belum dilengkapkan.</p>`:`<h2>Semua pemeriksaan lengkap</h2><p>Semua beg dan shift sudah disemak hari ini.</p>`}</section>
     <section class="card status-summary"><div class="section-head"><h2>Status Hari Ini</h2><span class="state-dot ${completed.size===6?"done":"pending"}">${completed.size===6?"\u2713":"!"}</span></div><div class="progress-row"><div class="progress-ring" style="--progress:${Math.round(completed.size/6*100)}%"><strong>${completed.size}/6</strong></div><div class="progress-copy"><strong>${completed.size} pemeriksaan selesai</strong><small>2 beg \u00d7 3 shift setiap hari</small></div></div></section>
@@ -108,6 +121,7 @@ async function runRefresh(){
   const from=isoDate(weekDays[0]); const to=isoDate(weekDays[6]);
   const dashboardResult=await fetchDashboard(from,to).then(value=>({ok:true,value})).catch(error=>({ok:false,error}));
   if(dashboardResult.ok){
+    reconcileConfirmedPending(dashboardResult.value.records,dashboardResult.value.findings);
     dashboardResult.value.records.forEach(record=>{ if(record.quantities) saveLatestInventory(record); });
     records=reconcileRemoteRecords(dashboardResult.value.records,from,to);
   }
