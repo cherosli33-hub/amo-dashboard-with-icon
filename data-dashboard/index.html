@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0f172a">
-  <title>Dashboard Penerima · AMO Dashboard v2</title><link rel="stylesheet" href="./styles.css?v=8">
+  <title>Dashboard Penerima · AMO Dashboard v2</title><link rel="stylesheet" href="./styles.css?v=9">
 </head>
 <body class="app-shell">
   <aside class="sidebar no-print" aria-label="Navigasi Dashboard Penerima">
@@ -39,6 +39,10 @@
             <div class="action-toolbar"><label class="select-all"><input id="selectAllActions" type="checkbox"> <span>Pilih semua tindakan tertunggak</span></label><div class="action-buttons"><button id="ackSelectedBtn" class="secondary" type="button" disabled>✓ Ambil maklum</button><button id="verifySelectedBtn" type="button" disabled>✓ Sahkan</button></div></div>
             <p id="actionStatus" class="action-status" role="status"></p><div id="actionList" class="action-list"><p class="empty">Menunggu data tindakan…</p></div>
           </section>
+          <section class="panel verification-archive" aria-labelledby="verificationArchiveTitle">
+            <div class="section-heading"><div><p class="eyebrow">ARKIB PENGESAHAN</p><h2 id="verificationArchiveTitle">Laporan Pengesahan Bulanan</h2><p class="section-note">Senarai rekod pengesahan PHC terdahulu mengikut bulan.</p></div><select id="verificationYear" aria-label="Tahun laporan pengesahan"></select></div>
+            <div id="verificationArchiveList" class="verification-archive-list"><p class="empty">Menunggu rekod pengesahan…</p></div>
+          </section>
         </section>
         <section class="dashboard-view" data-panel="laporan" hidden><section class="panel data-panel report-centre" aria-labelledby="monthlyReportTitle"><div class="toolbar"><div><p class="eyebrow">LAPORAN BULANAN</p><h2 id="monthlyReportTitle">Ringkasan Prosedur, Asthma, PHC & GIRN</h2><p>Jana laporan lengkap untuk semakan, cetakan atau PDF.</p></div><div class="export-actions"><button id="printPreviewBtn" type="button" disabled>Cetak / PDF</button></div></div><div class="report-controls no-print"><nav id="tabs" aria-label="Jenis laporan bulanan"></nav><label><span>Bulan laporan</span><input id="reportMonth" type="month"></label><button id="generateReportBtn" type="button">Jana laporan bulanan</button></div><div class="table-meta"><p id="status" role="status">Pilih bulan dan jana laporan.</p></div><div id="monthlyReportPreview" class="monthly-report-preview"><p class="empty">Laporan bulanan belum dijana.</p></div></section></section>
       </div>
@@ -46,6 +50,6 @@
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="printDialog" class="print-dialog"><div class="preview-shell"><div class="preview-toolbar no-print"><div><strong>Print Preview</strong><small id="previewHint">Semak laporan sebelum mencetak.</small></div><div><button id="closePreviewBtn" class="ghost" type="button">Tutup</button><button id="printBtn" type="button">Print / Save as PDF</button></div></div><article id="printReport" class="print-report" aria-label="Laporan untuk cetakan"></article></div></dialog>
-  <script type="module" src="./app.js?v=8"></script>
+  <script type="module" src="./app.js?v=9"></script>
 </body>
 </html>

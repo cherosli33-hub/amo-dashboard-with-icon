@@ -1,4 +1,4 @@
-import { collection, doc, limit, onSnapshot, query, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { collection, doc, onSnapshot, query, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
 import { auth, db } from "../shared/firebase/core.js";
 import { logout, prepareAuth } from "../shared/firebase/auth.js";
@@ -44,6 +44,8 @@ const ackSelectedBtn = document.querySelector("#ackSelectedBtn");
 const verifySelectedBtn = document.querySelector("#verifySelectedBtn");
 const verifyPhcDayBtn = document.querySelector("#verifyPhcDayBtn");
 const printDialog = document.querySelector("#printDialog");
+const verificationYear = document.querySelector("#verificationYear");
+const verificationArchiveList = document.querySelector("#verificationArchiveList");
 const viewTitles = { utama:"Command Centre ETD", aktiviti:"Aliran Aktiviti Terkini", tindakan:"Pusat Tindakan & Pengesahan", laporan:"Laporan Bulanan Umum" };
 let sessionUser = null;
 let sessionProfile = null;
@@ -147,10 +149,12 @@ function renderHero() {
 
 function renderModuleCards() {
   const issues = issueCounts();
+  const procedureRows = todayRows(procedure);
+  const procedureTotal = procedureRows.reduce((sum, row) => sum + procedureNames(row).length, 0);
   const phcShifts = new Set(todayRows(phc).map(row => shiftId(row.shift)).filter(Boolean));
   const girnShifts = new Set(todayRows(girn).map(row => shiftId(row.shift)).filter(Boolean));
   const cards = [
-    { module:procedure, value:todayRows(procedure).length, label:"prosedur hari ini", note:"Log kes diterima", tone:"blue" },
+    { module:procedure, value:procedureTotal, label:"prosedur hari ini", note:`${procedureRows.length} log kes diterima`, tone:"blue" },
     { module:asthma, value:todayRows(asthma).length, label:"penilaian hari ini", note:issues.severeAsthma.length || issues.incompleteAsthma.length ? `${issues.severeAsthma.length + issues.incompleteAsthma.length} perlu perhatian` : "Semua rekod stabil", tone:"amber" },
     { module:phc, value:`${phcShifts.size}/3`, label:"syif direkod", note:issues.phcNotes.length ? `${issues.phcNotes.length} Tindakan Catatan` : "Tiada catatan tertunggak", tone:"green" },
     { module:girn, value:`${girnShifts.size}/3`, label:"syif diperiksa", note:issues.girnIssues.length ? `${issues.girnIssues.length} isu ditemui` : "Tiada isu tertunggak", tone:"purple" }
@@ -332,8 +336,45 @@ function renderConnection() {
 }
 
 function renderAll() {
-  renderHero(); renderModuleCards(); renderAttention(); renderShifts(); renderRecent(); renderActions(); renderConnection();
+  renderHero(); renderModuleCards(); renderAttention(); renderShifts(); renderRecent(); renderActions(); renderVerificationArchive(); renderConnection();
   lastUpdated.textContent = `Dikemas kini ${new Date().toLocaleTimeString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", minute:"2-digit", second:"2-digit" })}`;
+}
+
+function phcVerificationAudits() {
+  return rowsFor(supervisorAudit)
+    .filter(row => row.sourceModule === "phc-daily")
+    .map(row => ({ ...row, auditDate:row.sourceDate || recordDate(row) }))
+    .filter(row => /^\d{4}-\d{2}-\d{2}$/.test(row.auditDate))
+    .sort((a, b) => b.auditDate.localeCompare(a.auditDate));
+}
+
+function renderVerificationArchive() {
+  const audits = phcVerificationAudits();
+  const currentYear = String(new Date().toLocaleString("en-CA", { timeZone:"Asia/Kuala_Lumpur", year:"numeric" }));
+  const years = [...new Set([currentYear, ...audits.map(row => row.auditDate.slice(0, 4))])].sort((a, b) => b.localeCompare(a));
+  const selected = years.includes(verificationYear.value) ? verificationYear.value : years[0];
+  verificationYear.innerHTML = years.map(year => `<option value="${year}" ${year === selected ? "selected" : ""}>Tahun ${year}</option>`).join("");
+  const currentMonth = localDateKey().slice(0, 7);
+  const months = [...new Set([...(currentMonth.startsWith(selected) ? [currentMonth] : []), ...audits.filter(row => row.auditDate.startsWith(selected)).map(row => row.auditDate.slice(0, 7))])].sort((a, b) => b.localeCompare(a));
+  verificationArchiveList.innerHTML = months.length ? months.map(month => {
+    const rows = audits.filter(row => row.auditDate.startsWith(month));
+    const days = new Set(rows.map(row => row.auditDate)).size;
+    const label = new Date(`${month}-15T12:00:00+08:00`).toLocaleDateString("ms-MY", { month:"long", year:"numeric" });
+    const active = month === currentMonth;
+    const details = rows.length ? rows.map(row => `<li><span>${escapeHtml(row.auditDate)}</span><strong>${escapeHtml(row.actorName || row.actorEmail || "Penyelia")}</strong><small>${escapeHtml(row.sourceDetail || "Pengesahan PHC harian")}</small></li>`).join("") : `<li class="empty">Belum ada pengesahan direkodkan untuk bulan ini.</li>`;
+    return `<article class="verification-month"><div class="verification-summary"><span class="calendar-icon">▣</span><div><strong>${escapeHtml(label)}</strong><small>Status: ${active ? '<b class="active-status">Aktif</b>' : "Selesai"} · ${days} hari disahkan</small></div><div class="verification-actions"><button type="button" class="secondary" data-verification-pdf="${month}">↓ PDF</button><button type="button" data-verification-view="${month}">Lihat</button></div></div><ul id="verification-${month}" class="verification-details" hidden>${details}</ul></article>`;
+  }).join("") : '<p class="empty">Belum ada laporan pengesahan untuk tahun ini.</p>';
+}
+
+function openVerificationPrint(month) {
+  const rows = phcVerificationAudits().filter(row => row.auditDate.startsWith(month));
+  const label = new Date(`${month}-15T12:00:00+08:00`).toLocaleDateString("ms-MY", { month:"long", year:"numeric" });
+  const meta = { label };
+  const body = `<section class="report-kpis">${kpi("Hari disahkan", number.format(new Set(rows.map(row => row.auditDate)).size))}${kpi("Rekod audit", number.format(rows.length))}</section><section class="report-section"><h2>Rekod pengesahan PHC harian</h2><table><thead><tr><th>Tarikh</th><th>Penyelia</th><th>Butiran</th></tr></thead><tbody>${rows.length ? rows.map(row => `<tr><td>${escapeHtml(row.auditDate)}</td><td>${escapeHtml(row.actorName || row.actorEmail || "Penyelia")}</td><td>${escapeHtml(row.sourceDetail || "Pengesahan PHC harian")}</td></tr>`).join("") : '<tr><td colspan="3">Belum ada pengesahan direkodkan.</td></tr>'}</tbody></table></section>`;
+  document.querySelector("#printReport").innerHTML = reportDocument("Laporan Pengesahan Bulanan PHC", meta, body);
+  document.querySelector("#previewHint").textContent = `Pengesahan PHC · ${label}`;
+  document.body.classList.add("preview-open");
+  requestAnimationFrame(() => printDialog.showModal());
 }
 
 function selectModule(module) {
@@ -351,7 +392,7 @@ function selectModule(module) {
 
 function startLiveData() {
   streams.forEach(module => {
-    const stop = onSnapshot(query(collection(db, module.collection), limit(5000)), snapshot => {
+    const stop = onSnapshot(query(collection(db, module.collection)), snapshot => {
       const rows = snapshot.docs.map(item => ({ id:item.id, ...item.data() })).filter(row => !module.filter || module.filter(row)).sort((a, b) => recordTime(b) - recordTime(a));
       state.data.set(module.id, rows); state.ready.add(module.id); state.errors.delete(module.id); state.reportDirty = true; renderAll();
     }, error => { console.error(`Gagal membaca ${module.collection}`, error); state.errors.add(module.id); renderConnection(); });
@@ -497,6 +538,17 @@ document.querySelectorAll("[data-view]").forEach(button => button.addEventListen
 document.querySelectorAll("[data-open-view]").forEach(button => button.addEventListener("click", () => switchView(button.dataset.openView)));
 document.querySelector("#menuToggle").addEventListener("click", () => document.body.classList.toggle("menu-open"));
 document.querySelector("#refreshBtn").addEventListener("click", () => { renderAll(); showToast("Data langsung telah disegar semula."); });
+verificationYear.addEventListener("change", renderVerificationArchive);
+verificationArchiveList.addEventListener("click", event => {
+  const viewButton = event.target.closest("[data-verification-view]");
+  const pdfButton = event.target.closest("[data-verification-pdf]");
+  if (viewButton) {
+    const details = document.querySelector(`#verification-${viewButton.dataset.verificationView}`);
+    details.hidden = !details.hidden;
+    viewButton.textContent = details.hidden ? "Lihat" : "Tutup";
+  }
+  if (pdfButton) openVerificationPrint(pdfButton.dataset.verificationPdf);
+});
 
 primaryModules.forEach(module => {
   const button = document.createElement("button"); button.type = "button"; button.dataset.id = module.id; button.textContent = module.label; button.addEventListener("click", () => selectModule(module)); tabs.append(button);
