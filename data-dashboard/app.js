@@ -44,6 +44,7 @@ const ackSelectedBtn = document.querySelector("#ackSelectedBtn");
 const verifySelectedBtn = document.querySelector("#verifySelectedBtn");
 const verifyPhcDayBtn = document.querySelector("#verifyPhcDayBtn");
 const printDialog = document.querySelector("#printDialog");
+const viewTitles = { utama:"Command Centre ETD", aktiviti:"Aliran Aktiviti Terkini", tindakan:"Pusat Tindakan & Pengesahan", laporan:"Laporan Bulanan Umum" };
 let sessionUser = null;
 let sessionProfile = null;
 const adminEmails = new Set(["cherosli33@gmail.com", "cherosli@moh.gov.my"]);
@@ -260,6 +261,7 @@ function renderActions() {
   const existing = new Set(items.map(item => item.key));
   [...state.selectedActions].forEach(key => { if (!existing.has(key)) state.selectedActions.delete(key); });
   actionCount.textContent = number.format(items.length + (phcDailyState().records.length && !phcDailyState().complete ? 1 : 0));
+  document.querySelector("#navActionCount").textContent = actionCount.textContent;
   actionList.innerHTML = items.length ? items.map(({ module, row, key }) => `<label class="action-item ${state.selectedActions.has(key) ? "selected" : ""}"><span class="action-check"><input type="checkbox" data-action-key="${escapeHtml(key)}" ${state.selectedActions.has(key) ? "checked" : ""}></span><span class="action-copy"><strong>${escapeHtml(actionTitleFor(module, row))}</strong><span>${escapeHtml(actionDetailFor(module, row) || "Tiada catatan tambahan")}</span></span><span class="action-badge">${escapeHtml(actionBadgeFor(module, row))}</span></label>`).join("") : `<div class="action-empty">✓ Tiada Tindakan Catatan atau isu modul yang tertunggak.</div>`;
   actionList.querySelectorAll("[data-action-key]").forEach(input => input.addEventListener("change", () => { input.checked ? state.selectedActions.add(input.dataset.actionKey) : state.selectedActions.delete(input.dataset.actionKey); renderActions(); }));
   const selectedCount = state.selectedActions.size;
@@ -336,6 +338,7 @@ function renderAll() {
 
 function selectModule(module) {
   if (!primaryModules.includes(module)) return;
+  switchView("laporan");
   state.active = module;
   [...tabs.children].forEach(button => button.classList.toggle("active", button.dataset.id === module.id));
   state.reportHtml = "";
@@ -473,6 +476,28 @@ function printReport() {
   requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
 }
 
+function showToast(message) {
+  const toast = document.querySelector("#toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+function switchView(view) {
+  const selected = viewTitles[view] ? view : "utama";
+  document.querySelectorAll("[data-panel]").forEach(panel => { panel.hidden = panel.dataset.panel !== selected; });
+  document.querySelectorAll("[data-view]").forEach(button => button.classList.toggle("active", button.dataset.view === selected));
+  document.querySelector("#pageTitle").textContent = viewTitles[selected];
+  document.body.classList.remove("menu-open");
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+
+document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => switchView(button.dataset.view)));
+document.querySelectorAll("[data-open-view]").forEach(button => button.addEventListener("click", () => switchView(button.dataset.openView)));
+document.querySelector("#menuToggle").addEventListener("click", () => document.body.classList.toggle("menu-open"));
+document.querySelector("#refreshBtn").addEventListener("click", () => { renderAll(); showToast("Data langsung telah disegar semula."); });
+
 primaryModules.forEach(module => {
   const button = document.createElement("button"); button.type = "button"; button.dataset.id = module.id; button.textContent = module.label; button.addEventListener("click", () => selectModule(module)); tabs.append(button);
 });
@@ -505,6 +530,10 @@ if (!user || user.isAnonymous || !isSupervisor(profile)) {
 } else {
   sessionUser = user; sessionProfile = profile;
   document.querySelector("#userLabel").textContent = `${profile.name || user.displayName || user.email} · ${roleLabel()}`;
+  const displayName = profile.name || user.displayName || user.email || "Pengguna";
+  document.querySelector("#userName").textContent = displayName;
+  document.querySelector("#userRole").textContent = roleLabel();
+  document.querySelector("#userInitials").textContent = displayName.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
   document.querySelector("#supervisorCentre").hidden = false;
   gate.hidden = true; dashboard.hidden = false;
   [...tabs.children].find(button => button.dataset.id === state.active.id)?.classList.add("active");
