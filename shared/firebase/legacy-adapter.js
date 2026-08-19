@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDoc, getDocs, limit, onSnapshot, query, serverTimestamp, setDoc, updateDoc
+  collection, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where
 } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import { auth, db } from "./core.js";
 import { ensureAppSession } from "./auth.js";
@@ -25,6 +25,12 @@ function plain(value) {
 async function list(name) {
   await ensureAppSession();
   const snapshot = await getDocs(query(collection(db, name), limit(5000)));
+  return snapshot.docs.map(item => ({ id: item.id, ...plain(item.data()) }));
+}
+
+async function listMatching(name, ...constraints) {
+  await ensureAppSession();
+  const snapshot = await getDocs(query(collection(db, name), ...constraints));
   return snapshot.docs.map(item => ({ id: item.id, ...plain(item.data()) }));
 }
 
@@ -139,7 +145,13 @@ async function savePhcInspection(record) {
     createdBy: auth.currentUser?.uid || ""
   });
   const shortages = items.filter(item => Number(item.qty) < Number(item.standard));
-  const existingFindings = await list(COLLECTIONS.phcFindings);
+  // Hanya finding terbuka diperlukan untuk dedup restock. Membaca seluruh sejarah
+  // findings menyebabkan setiap sync checklist semakin perlahan apabila data bertambah.
+  const existingFindings = await listMatching(
+    COLLECTIONS.phcFindings,
+    where("status", "==", "Belum diambil tindakan"),
+    limit(1000)
+  );
   for (let index = 0; index < shortages.length; index += 1) {
     const finding = phcFinding(record, shortages[index], index);
     const priorOpen = existingFindings
@@ -180,11 +192,17 @@ async function requireSupervisor() {
 async function phcRequest(action, params, body) {
   if (action === "saveInspection") return savePhcInspection(body.record);
   if (action === "records" || action === "dashboard" || action === "latestInventory") {
-    let records = (await list(COLLECTIONS.phc)).filter(item => inRange(item, params.from, params.to));
+    let records = action === "latestInventory"
+      ? await listMatching(COLLECTIONS.phc, orderBy("savedAt", "desc"), limit(100))
+      : (await list(COLLECTIONS.phc)).filter(item => inRange(item, params.from, params.to));
     if (action === "latestInventory") {
       const latest = {};
       records.forEach(record => { if (!latest[record.bag] || String(record.savedAt) > String(latest[record.bag].savedAt)) latest[record.bag] = record; });
-      const resolved = (await list(COLLECTIONS.phcFindings)).filter(item => item.type === "shortage" && item.status !== "Belum diambil tindakan");
+      const resolved = (await listMatching(
+        COLLECTIONS.phcFindings,
+        where("status", "==", "Telah diambil tindakan"),
+        limit(1000)
+      )).filter(item => item.type === "shortage");
       records = Object.values(latest).map(record => {
         const copy = structuredClone(record);
         Object.values(copy.quantities || {}).forEach(group => (group.items || []).forEach(item => {
