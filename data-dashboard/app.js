@@ -391,12 +391,8 @@ function monthlyRows(module) {
   return rowsFor(module).filter(row => recordDate(row).startsWith(prefix));
 }
 
-function mark(done) {
-  return `<span class="report-mark ${done ? "done" : "missing"}">${done ? "✓" : "✕"}</span>`;
-}
-
-function kpi(label, value, note = "") {
-  return `<div class="report-kpi"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong>${note ? `<span>${escapeHtml(note)}</span>` : ""}</div>`;
+function kpi(label, value, note = "", tone = "") {
+  return `<div class="report-kpi ${tone ? `kpi-${escapeHtml(tone)}` : ""}"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong>${note ? `<span>${escapeHtml(note)}</span>` : ""}</div>`;
 }
 
 function signatureBlock() {
@@ -442,18 +438,29 @@ function asthmaReport(meta) {
   return reportDocument("Laporan Bulanan Asthma", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size))}${kpi("Jumlah penilaian", number.format(rows.length))}${kpi("Before + After lengkap", rows.length ? `${((complete / rows.length) * 100).toFixed(1)}%` : "0.0%", `${complete}/${rows.length}`)}${kpi("PEFR tidak dibuat", number.format(notDone))}${kpi("Uptriage", number.format(uptriage))}</section><section class="report-section"><h2>Ringkasan setiap pesakit</h2><table><thead><tr><th>Tarikh</th><th>Pesakit / IC-RN</th><th>Kategori</th><th>Penilaian</th><th>Before → After</th><th>Lengkap</th><th>Uptriage</th></tr></thead><tbody>${patientRows.length ? patientRows.join("") : `<tr><td colspan="7" class="print-empty">Tiada penilaian Asthma direkodkan bagi bulan ini.</td></tr>`}</tbody></table></section>`);
 }
 
+function reportStatus(tone, symbol, label) {
+  return `<span class="daily-report-status ${escapeHtml(tone)}"><i aria-hidden="true">${escapeHtml(symbol)}</i><span>${escapeHtml(label)}</span></span>`;
+}
+
+function dailyChecklistReport(module, title, meta) {
+  const rows = monthlyRows(module);
+  const { dayStates, reportDays, compliantDays, pendingVerificationDays, missingDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
+  const daily = dayStates.map(day => {
+    const dateLabel = new Date(`${day.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
+    const checklistStatus = day.completed ? reportStatus("done", "✓", "Dibuat") : reportStatus("missing", "✕", "Tidak dibuat");
+    const verificationStatus = day.status === "verified" ? reportStatus("done", "✓", "Disahkan") : day.status === "pending" ? reportStatus("pending", "◷", "Belum disahkan") : reportStatus("neutral", "−", "—");
+    return `<tr><td><strong>${escapeHtml(dateLabel)}</strong></td><td>${checklistStatus}</td><td>${verificationStatus}</td><td class="record-count">${number.format(day.recordCount)}</td></tr>`;
+  }).join("");
+  const emptyRow = `<tr><td colspan="4" class="print-empty">Tiada tarikh untuk dinilai bagi bulan ini.</td></tr>`;
+  return reportDocument(title, meta, `<section class="report-kpis daily-report-kpis">${kpi("Hari dinilai", number.format(reportDays.length), "Tarikh hingga hari ini", "info")}${kpi("Hari patuh", number.format(compliantDays), "Dibuat dan disahkan", "good")}${kpi("Belum disahkan", number.format(pendingVerificationDays), "Menunggu penyelia", "pending")}${kpi("Tidak dibuat", number.format(missingDays), "Tiada checklist", "missing")}${kpi("Pematuhan", `${rate.toFixed(1)}%`, `${number.format(compliantDays)}/${number.format(reportDays.length)} hari`, "info")}</section><section class="report-section daily-section"><h2>Status harian ${escapeHtml(module.label)}</h2><p>Ringkasan checklist dan pengesahan penyelia bagi setiap tarikh.</p><table class="daily-report-table"><thead><tr><th>Tarikh</th><th>Status Checklist</th><th>Status Pengesahan</th><th>Bilangan Rekod</th></tr></thead><tbody>${daily || emptyRow}</tbody></table><p class="daily-report-legend"><strong>Patuh</strong> = sekurang-kurangnya satu checklist dibuat dan semua rekod pada tarikh tersebut telah disahkan.</p></section>`);
+}
+
 function phcReport(meta) {
-  const rows = monthlyRows(phc);
-  const { completedDays, reportDays, compliantDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
-  const daily = reportDays.map(date => `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))} ${mark(completedDays.has(date))}</td></tr>`);
-  return reportDocument("Laporan Bulanan PHC", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Hari patuh", `${number.format(compliantDays)}/${number.format(reportDays.length)}`)}${kpi("Hari dinilai", number.format(reportDays.length))}</section><section class="report-section daily-section"><h2>Pematuhan harian PHC</h2><p>✓ ada checklist · ✕ tiada checklist</p><table><thead><tr><th>Tarikh</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
+  return dailyChecklistReport(phc, "Laporan Bulanan PHC", meta);
 }
 
 function girnReport(meta) {
-  const rows = monthlyRows(girn);
-  const { completedDays, reportDays, compliantDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
-  const daily = reportDays.map(date => `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))} ${mark(completedDays.has(date))}</td></tr>`);
-  return reportDocument("Laporan Bulanan GIRN", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Hari patuh", `${number.format(compliantDays)}/${number.format(reportDays.length)}`)}${kpi("Hari dinilai", number.format(reportDays.length))}</section><section class="report-section daily-section"><h2>Pematuhan harian GIRN</h2><p>✓ ada checklist · ✕ tiada checklist</p><table><thead><tr><th>Tarikh</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
+  return dailyChecklistReport(girn, "Laporan Bulanan GIRN", meta);
 }
 
 function generateMonthlyReport() {

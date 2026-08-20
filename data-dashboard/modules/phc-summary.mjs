@@ -26,11 +26,27 @@ export function selectAllDailyVerificationKeys(items, checked) {
 }
 
 export function buildDailyComplianceSummary(rows, meta, today, recordDate) {
-  const completedDays = new Set(rows.map(recordDate).filter(Boolean));
+  const recordsByDay = new Map();
+  rows.forEach(row => {
+    const date = recordDate(row);
+    if (!date) return;
+    if (!recordsByDay.has(date)) recordsByDay.set(date, []);
+    recordsByDay.get(date).push(row);
+  });
+  const completedDays = new Set(recordsByDay.keys());
   const currentMonth = today.slice(0, 7);
   const reportDays = meta.value > currentMonth ? [] : meta.value === currentMonth ? meta.days.filter(date => date <= today) : meta.days;
-  const compliantDays = reportDays.filter(date => completedDays.has(date)).length;
-  return { completedDays, reportDays, compliantDays, rate:reportDays.length ? (compliantDays / reportDays.length) * 100 : 0 };
+  const dayStates = reportDays.map(date => {
+    const records = recordsByDay.get(date) || [];
+    const completed = records.length > 0;
+    const verified = completed && records.every(row => row.verified === true);
+    return { date, records, recordCount:records.length, completed, verified, status:!completed ? "missing" : verified ? "verified" : "pending" };
+  });
+  const verifiedDays = new Set(dayStates.filter(day => day.verified).map(day => day.date));
+  const compliantDays = verifiedDays.size;
+  const pendingVerificationDays = dayStates.filter(day => day.status === "pending").length;
+  const missingDays = dayStates.filter(day => day.status === "missing").length;
+  return { completedDays, verifiedDays, recordsByDay, reportDays, dayStates, compliantDays, pendingVerificationDays, missingDays, rate:reportDays.length ? (compliantDays / reportDays.length) * 100 : 0 };
 }
 
 export function buildPhcMonthlySummary(rows, meta, today, recordDate) {

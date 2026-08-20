@@ -54,11 +54,11 @@ test("pilih semua merangkumi pengesahan PHC dan GIRN", () => {
   assert.equal(selectAllDailyVerificationKeys(items, false).size, 0);
 });
 
-test("satu checklist pada mana-mana syif menjadikan hari itu patuh", () => {
+test("satu checklist yang disahkan pada mana-mana syif menjadikan hari itu patuh", () => {
   const days = Array.from({ length:31 }, (_, index) => `2026-08-${String(index + 1).padStart(2, "0")}`);
   const rows = [
-    { date:"2026-08-19", bag:"PHC 1", shift:"night" },
-    { date:"2026-08-20", bag:"PHC 2", shift:"morning" }
+    { date:"2026-08-19", bag:"PHC 1", shift:"night", verified:true },
+    { date:"2026-08-20", bag:"PHC 2", shift:"morning", verified:true }
   ];
   const summary = buildPhcMonthlySummary(rows, { value:"2026-08", days }, "2026-08-20", recordDate);
   assert.equal(summary.reportDays.length, 20);
@@ -76,12 +76,32 @@ test("tarikh akan datang tidak dimasukkan dalam pematuhan bulan semasa", () => {
 test("laporan GIRN mengira satu checklist pada mana-mana syif sebagai satu hari patuh", () => {
   const days = Array.from({ length:31 }, (_, index) => `2026-08-${String(index + 1).padStart(2, "0")}`);
   const rows = [
-    { date:"2026-08-18", shift:"night" },
-    { date:"2026-08-20", shift:"morning" },
-    { date:"2026-08-20", shift:"evening" }
+    { date:"2026-08-18", shift:"night", verified:true },
+    { date:"2026-08-20", shift:"morning", verified:true },
+    { date:"2026-08-20", shift:"evening", verified:true }
   ];
   const summary = buildDailyComplianceSummary(rows, { value:"2026-08", days }, "2026-08-20", recordDate);
   assert.equal(summary.reportDays.length, 20);
   assert.equal(summary.compliantDays, 2);
   assert.equal(summary.completedDays.size, 2);
+});
+
+test("laporan membezakan hari disahkan, belum disahkan dan tidak dibuat", () => {
+  const days = ["2026-08-01", "2026-08-02", "2026-08-03"];
+  const rows = [
+    { date:"2026-08-01", verified:true },
+    { date:"2026-08-01", verified:true },
+    { date:"2026-08-02", verified:true },
+    { date:"2026-08-02", verified:false }
+  ];
+  const summary = buildDailyComplianceSummary(rows, { value:"2026-08", days }, "2026-08-03", recordDate);
+  assert.equal(summary.compliantDays, 1);
+  assert.equal(summary.pendingVerificationDays, 1);
+  assert.equal(summary.missingDays, 1);
+  assert.ok(Math.abs(summary.rate - (100 / 3)) < Number.EPSILON * 100);
+  assert.deepEqual(summary.dayStates.map(day => [day.date, day.status, day.recordCount]), [
+    ["2026-08-01", "verified", 2],
+    ["2026-08-02", "pending", 2],
+    ["2026-08-03", "missing", 0]
+  ]);
 });
