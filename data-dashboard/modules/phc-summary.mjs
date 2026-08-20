@@ -25,6 +25,17 @@ export function selectAllDailyVerificationKeys(items, checked) {
   return new Set(checked ? items.map(item => item.key) : []);
 }
 
+export function latestRowsBySlot(rows, slotKey, recordTime) {
+  const latest = new Map();
+  rows.forEach(row => {
+    const key = slotKey(row);
+    if (!key) return;
+    const current = latest.get(key);
+    if (!current || recordTime(row) >= recordTime(current)) latest.set(key, row);
+  });
+  return [...latest.values()];
+}
+
 export function buildDailyComplianceSummary(rows, meta, today, recordDate) {
   const recordsByDay = new Map();
   rows.forEach(row => {

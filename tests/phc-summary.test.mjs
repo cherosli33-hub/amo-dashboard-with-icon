@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDailyComplianceSummary, buildDailyVerificationStates, buildPhcDailyStates, buildPhcMonthlySummary, selectAllDailyVerificationKeys } from "../data-dashboard/modules/phc-summary.mjs";
+import { buildDailyComplianceSummary, buildDailyVerificationStates, buildPhcDailyStates, buildPhcMonthlySummary, latestRowsBySlot, selectAllDailyVerificationKeys } from "../data-dashboard/modules/phc-summary.mjs";
 
 const recordDate = row => row.date || "";
 
@@ -104,4 +104,29 @@ test("laporan membezakan hari disahkan, belum disahkan dan tidak dibuat", () => 
     ["2026-08-02", "pending", 2],
     ["2026-08-03", "missing", 0]
   ]);
+});
+
+test("laporan PHC hanya mengira rekod terkini bagi setiap beg", () => {
+  const rows = [];
+  for (const bag of ["PHC 1", "PHC 2"]) {
+    for (const shift of ["Pagi", "Petang", "Malam"]) {
+      rows.push({ id:`${bag}-${shift}-lama`, date:"2026-08-20", bag, shift, savedAt:"2026-08-20T08:00:00+08:00" });
+      rows.push({ id:`${bag}-${shift}-baharu`, date:"2026-08-20", bag, shift, savedAt:"2026-08-20T09:00:00+08:00" });
+    }
+  }
+  const unique = latestRowsBySlot(rows, row => `${row.date}|${row.bag}`, row => new Date(row.savedAt).getTime());
+  assert.equal(unique.length, 2);
+  assert.ok(unique.every(row => row.id.endsWith("-baharu")));
+});
+
+test("laporan GIRN hanya mengira rekod terkini bagi setiap syif", () => {
+  const rows = [
+    { id:"pagi-lama", date:"2026-08-20", shift:"Pagi", savedAt:1 },
+    { id:"pagi-baharu", date:"2026-08-20", shift:"Pagi", savedAt:2 },
+    { id:"petang", date:"2026-08-20", shift:"Petang", savedAt:3 },
+    { id:"malam", date:"2026-08-20", shift:"Malam", savedAt:4 }
+  ];
+  const unique = latestRowsBySlot(rows, row => `${row.date}|${row.shift}`, row => row.savedAt);
+  assert.equal(unique.length, 3);
+  assert.deepEqual(unique.map(row => row.id), ["pagi-baharu", "petang", "malam"]);
 });

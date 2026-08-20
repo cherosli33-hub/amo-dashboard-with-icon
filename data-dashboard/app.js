@@ -11,7 +11,7 @@ import girn from "./modules/girn.js";
 import phcFindings from "./modules/phc-findings.js";
 import girnFindings from "./modules/girn-findings.js";
 import supervisorAudit from "./modules/supervisor-audit.js";
-import { buildDailyComplianceSummary, buildDailyVerificationStates, selectAllDailyVerificationKeys } from "./modules/phc-summary.mjs";
+import { buildDailyComplianceSummary, buildDailyVerificationStates, latestRowsBySlot, selectAllDailyVerificationKeys } from "./modules/phc-summary.mjs";
 
 const primaryModules = [procedure, asthma, phc, girn];
 const modules = [...primaryModules, phcFindings, girnFindings, supervisorAudit];
@@ -442,8 +442,18 @@ function reportStatus(tone, symbol, label) {
   return `<span class="daily-report-status ${escapeHtml(tone)}"><i aria-hidden="true">${escapeHtml(symbol)}</i><span>${escapeHtml(label)}</span></span>`;
 }
 
-function dailyChecklistReport(module, title, meta) {
+function monthlyChecklistRows(module) {
   const rows = monthlyRows(module);
+  return latestRowsBySlot(rows, row => {
+    const date = recordDate(row);
+    if (module.id === "phc") return `${date}|${String(row.bag || "beg-tidak-diketahui").trim().toLocaleUpperCase("ms-MY")}`;
+    const shift = shiftId(row.shift) || String(row.shift || "tidak-diketahui").trim().toLocaleLowerCase("ms-MY");
+    return `${date}|${shift}`;
+  }, recordTime);
+}
+
+function dailyChecklistReport(module, title, meta) {
+  const rows = monthlyChecklistRows(module);
   const { dayStates, reportDays, compliantDays, pendingVerificationDays, missingDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
   const daily = dayStates.map(day => {
     const dateLabel = new Date(`${day.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
