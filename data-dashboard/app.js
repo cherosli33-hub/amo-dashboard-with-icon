@@ -11,7 +11,7 @@ import girn from "./modules/girn.js";
 import phcFindings from "./modules/phc-findings.js";
 import girnFindings from "./modules/girn-findings.js";
 import supervisorAudit from "./modules/supervisor-audit.js";
-import { buildPhcDailyStates, buildPhcMonthlySummary } from "./modules/phc-summary.mjs";
+import { buildDailyComplianceSummary, buildDailyVerificationStates, selectAllDailyVerificationKeys } from "./modules/phc-summary.mjs";
 
 const primaryModules = [procedure, asthma, phc, girn];
 const modules = [...primaryModules, phcFindings, girnFindings, supervisorAudit];
@@ -25,7 +25,7 @@ const shiftDefinitions = [
   { id:"evening", label:"Petang", aliases:["evening", "afternoon", "petang"] },
   { id:"night", label:"Malam", aliases:["night", "malam"] }
 ];
-const state = { active:procedure, data:new Map(), ready:new Set(), errors:new Set(), stops:[], selectedActions:new Set(), acting:false, reportHtml:"", reportMonth:"", reportDirty:true };
+const state = { active:procedure, data:new Map(), ready:new Set(), errors:new Set(), stops:[], selectedActions:new Set(), selectedDailyVerifications:new Set(), acting:false, reportHtml:"", reportMonth:"", reportDirty:true };
 const number = new Intl.NumberFormat("ms-MY");
 const gate = document.querySelector("#gate");
 const dashboard = document.querySelector("#dashboard");
@@ -44,6 +44,9 @@ const selectAllActions = document.querySelector("#selectAllActions");
 const ackSelectedBtn = document.querySelector("#ackSelectedBtn");
 const verifySelectedBtn = document.querySelector("#verifySelectedBtn");
 const phcDailyList = document.querySelector("#phcDailyList");
+const girnDailyList = document.querySelector("#girnDailyList");
+const selectAllDailyVerifications = document.querySelector("#selectAllDailyVerifications");
+const verifySelectedDailyBtn = document.querySelector("#verifySelectedDailyBtn");
 const printDialog = document.querySelector("#printDialog");
 let sessionUser = null;
 let sessionProfile = null;
@@ -229,30 +232,49 @@ function actionBadgeFor(module, row) {
   return "Perlu tindakan";
 }
 
-function phcDailyStates() {
-  return buildPhcDailyStates(rowsFor(phc), rowsFor(supervisorAudit), recordDate);
+function dailyVerificationStates(module) {
+  return buildDailyVerificationStates(rowsFor(module), rowsFor(supervisorAudit), `${module.id}-daily`, recordDate);
 }
 
-function renderPhcDaily() {
-  const days = phcDailyStates();
-  const pending = days.filter(day => !day.complete);
-  if (!pending.length) {
-    const today = days.find(day => day.date === localDateKey());
-    phcDailyList.innerHTML = today ? `<article class="daily-verification complete"><div class="daily-icon" aria-hidden="true">PHC</div><div class="daily-copy"><small>PENGESAHAN HARIAN</small><strong>Pengesahan hari ini selesai · ${number.format(today.records.length)} rekod</strong><span>${today.audit?.actorName ? `Disahkan oleh ${escapeHtml(today.audit.actorName)}.` : "Semua rekod telah disahkan."}</span></div><button type="button" disabled>✓ Sudah disahkan</button></article>` : `<div class="action-empty">Belum ada rekod PHC untuk pengesahan.</div>`;
+function dailyVerificationItems() {
+  return [phc, girn].flatMap(module => dailyVerificationStates(module).filter(day => !day.complete).map(day => ({ module, day, key:`${module.id}:${day.date}` })));
+}
+
+function renderDailyVerificationModule(module, container, items) {
+  const moduleItems = items.filter(item => item.module.id === module.id);
+  if (!moduleItems.length) {
+    container.innerHTML = `<div class="action-empty">✓ Tiada pengesahan ${escapeHtml(module.label)} tertunggak.</div>`;
     return;
   }
-  phcDailyList.innerHTML = pending.map(day => {
+  container.innerHTML = moduleItems.map(({ day, key }) => {
     const dateLabel = new Date(`${day.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"short", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
-    return `<article class="daily-verification"><div class="daily-icon" aria-hidden="true">PHC</div><div class="daily-copy"><small>PENGESAHAN TERTUNGGAK</small><strong>${escapeHtml(dateLabel)} · ${number.format(day.records.length)} rekod</strong><span>${number.format(day.unverified.length)} rekod belum disahkan.</span></div><button type="button" data-phc-date="${escapeHtml(day.date)}" ${state.acting ? "disabled" : ""}>Sahkan</button></article>`;
+    const selected = state.selectedDailyVerifications.has(key);
+    return `<article class="daily-verification ${selected ? "selected" : ""}"><label class="daily-check"><input type="checkbox" data-daily-key="${escapeHtml(key)}" ${selected ? "checked" : ""} ${state.acting ? "disabled" : ""}><span class="sr-only">Pilih ${escapeHtml(module.label)} ${escapeHtml(dateLabel)}</span></label><div class="daily-icon" aria-hidden="true">${escapeHtml(module.label)}</div><div class="daily-copy"><small>PENGESAHAN TERTUNGGAK</small><strong>${escapeHtml(dateLabel)} · ${number.format(day.records.length)} rekod</strong><span>${number.format(day.unverified.length)} rekod belum disahkan.</span></div><button type="button" data-daily-verify="${escapeHtml(key)}" ${state.acting ? "disabled" : ""}>Sahkan</button></article>`;
   }).join("");
-  phcDailyList.querySelectorAll("[data-phc-date]").forEach(button => button.addEventListener("click", () => verifyPhcDay(button.dataset.phcDate)));
+}
+
+function renderDailyVerifications() {
+  const items = dailyVerificationItems();
+  const existing = new Set(items.map(item => item.key));
+  [...state.selectedDailyVerifications].forEach(key => { if (!existing.has(key)) state.selectedDailyVerifications.delete(key); });
+  renderDailyVerificationModule(phc, phcDailyList, items);
+  renderDailyVerificationModule(girn, girnDailyList, items);
+  document.querySelectorAll("[data-daily-key]").forEach(input => input.addEventListener("change", () => { input.checked ? state.selectedDailyVerifications.add(input.dataset.dailyKey) : state.selectedDailyVerifications.delete(input.dataset.dailyKey); renderActions(); }));
+  document.querySelectorAll("[data-daily-verify]").forEach(button => button.addEventListener("click", () => verifyDailyVerifications([button.dataset.dailyVerify])));
+  const selectedCount = state.selectedDailyVerifications.size;
+  const allSelected = items.length > 0 && items.every(item => state.selectedDailyVerifications.has(item.key));
+  selectAllDailyVerifications.checked = allSelected;
+  selectAllDailyVerifications.indeterminate = !allSelected && selectedCount > 0;
+  selectAllDailyVerifications.disabled = state.acting || items.length === 0;
+  verifySelectedDailyBtn.disabled = state.acting || selectedCount === 0;
+  verifySelectedDailyBtn.textContent = selectedCount ? `✓ Sahkan dipilih (${number.format(selectedCount)})` : "✓ Sahkan dipilih";
 }
 
 function renderActions() {
   const items = actionItems();
   const existing = new Set(items.map(item => item.key));
   [...state.selectedActions].forEach(key => { if (!existing.has(key)) state.selectedActions.delete(key); });
-  actionCount.textContent = number.format(items.length + phcDailyStates().filter(day => !day.complete).length);
+  actionCount.textContent = number.format(items.length + dailyVerificationItems().length);
   actionList.innerHTML = items.length ? items.map(({ module, row, key }) => `<label class="action-item ${state.selectedActions.has(key) ? "selected" : ""}"><span class="action-check"><input type="checkbox" data-action-key="${escapeHtml(key)}" ${state.selectedActions.has(key) ? "checked" : ""}></span><span class="action-copy"><strong>${escapeHtml(actionTitleFor(module, row))}</strong><span>${escapeHtml(actionDetailFor(module, row) || "Tiada catatan tambahan")}</span></span><span class="action-badge">${escapeHtml(actionBadgeFor(module, row))}</span></label>`).join("") : `<div class="action-empty">✓ Tiada Tindakan Catatan atau isu modul yang tertunggak.</div>`;
   actionList.querySelectorAll("[data-action-key]").forEach(input => input.addEventListener("change", () => { input.checked ? state.selectedActions.add(input.dataset.actionKey) : state.selectedActions.delete(input.dataset.actionKey); renderActions(); }));
   const selectedCount = state.selectedActions.size;
@@ -262,7 +284,7 @@ function renderActions() {
   selectAllActions.checked = allSelected;
   selectAllActions.indeterminate = !allSelected && selectedCount > 0;
   selectAllActions.disabled = state.acting || items.length === 0;
-  renderPhcDaily();
+  renderDailyVerifications();
 }
 
 function actorName() { return sessionProfile?.name || sessionUser?.displayName || sessionUser?.email || "Penyelia"; }
@@ -296,25 +318,29 @@ async function runSelectedAction(mode) {
   finally { state.acting = false; renderActions(); }
 }
 
-async function verifyPhcDay(date) {
-  const daily = phcDailyStates().find(day => day.date === date);
-  if (!daily) return;
-  if (state.acting || daily.complete || !daily.records.length) return;
-  const dateLabel = new Date(`${daily.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
-  if (!confirm(`Sahkan keseluruhan ${daily.records.length} rekod PHC untuk ${dateLabel}? Pengesahan ini dibuat sekali bagi tarikh tersebut.`)) return;
-  state.acting = true; actionStatus.textContent = "Menyimpan pengesahan PHC harian…"; renderActions();
+async function verifyDailyVerifications(keys) {
+  const requested = new Set(keys);
+  const items = dailyVerificationItems().filter(item => requested.has(item.key));
+  if (state.acting || !items.length) return;
+  const recordCount = items.reduce((sum, item) => sum + item.day.unverified.length, 0);
+  const moduleLabels = [...new Set(items.map(item => item.module.label))].join(" & ");
+  if (!confirm(`Sahkan ${items.length} pengesahan harian ${moduleLabels} melibatkan ${recordCount} rekod?`)) return;
+  state.acting = true; actionStatus.textContent = `Menyimpan ${items.length} pengesahan harian…`; renderActions();
   try {
-    const chunks = [];
-    for (let index = 0; index < daily.unverified.length; index += 399) chunks.push(daily.unverified.slice(index, index + 399));
-    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
-      const chunk = chunks[chunkIndex];
-      const batch = writeBatch(db);
-      chunk.forEach(row => batch.update(doc(db, phc.collection, row.id), { verified:true, verifiedBy:actorName(), verifiedEmail:sessionUser?.email || sessionProfile?.email || "", verifiedAt:serverTimestamp() }));
-      if (chunkIndex === chunks.length - 1) batch.set(doc(collection(db, COLLECTIONS.actionTasks)), { recordType:"audit", status:"completed", state:"completed", sourceCollection:phc.collection, sourceModule:"phc-daily", sourceDate:daily.date, sourceTitle:`Pengesahan PHC harian ${daily.date}`, sourceDetail:`${daily.records.length} rekod disahkan sekali untuk keseluruhan hari`, recordIds:daily.records.map(row => row.id), actionType:"daily-verify", actionLabel:"Pengesahan harian", actorUid:sessionUser?.uid || "", actorName:actorName(), actorEmail:sessionUser?.email || sessionProfile?.email || "", actorRole:sessionProfile?.role || "", actedAt:serverTimestamp() });
-      await batch.commit();
+    for (const { module, day } of items) {
+      const chunks = [];
+      for (let index = 0; index < day.unverified.length; index += 399) chunks.push(day.unverified.slice(index, index + 399));
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+        const chunk = chunks[chunkIndex];
+        const batch = writeBatch(db);
+        chunk.forEach(row => batch.update(doc(db, module.collection, row.id), { verified:true, verifiedBy:actorName(), verifiedEmail:sessionUser?.email || sessionProfile?.email || "", verifiedAt:serverTimestamp() }));
+        if (chunkIndex === chunks.length - 1) batch.set(doc(collection(db, COLLECTIONS.actionTasks)), { recordType:"audit", status:"completed", state:"completed", sourceCollection:module.collection, sourceModule:`${module.id}-daily`, sourceDate:day.date, sourceTitle:`Pengesahan ${module.label} harian ${day.date}`, sourceDetail:`${day.records.length} rekod disahkan sekali untuk keseluruhan hari`, recordIds:day.records.map(row => row.id), actionType:"daily-verify", actionLabel:"Pengesahan harian", actorUid:sessionUser?.uid || "", actorName:actorName(), actorEmail:sessionUser?.email || sessionProfile?.email || "", actorRole:sessionProfile?.role || "", actedAt:serverTimestamp() });
+        await batch.commit();
+      }
     }
-    actionStatus.textContent = `${daily.records.length} rekod PHC bagi ${dateLabel} disahkan oleh ${actorName()}.`;
-  } catch (error) { console.error("Pengesahan PHC harian gagal", error); actionStatus.textContent = error.message || "Pengesahan harian gagal disimpan."; }
+    items.forEach(item => state.selectedDailyVerifications.delete(item.key));
+    actionStatus.textContent = `${items.length} pengesahan harian ${moduleLabels} berjaya disahkan oleh ${actorName()}.`;
+  } catch (error) { console.error("Pengesahan harian gagal", error); actionStatus.textContent = error.message || "Pengesahan harian gagal disimpan."; }
   finally { state.acting = false; renderActions(); }
 }
 
@@ -418,18 +444,16 @@ function asthmaReport(meta) {
 
 function phcReport(meta) {
   const rows = monthlyRows(phc);
-  const { completedDays, reportDays, compliantDays, rate } = buildPhcMonthlySummary(rows, meta, localDateKey(), recordDate);
+  const { completedDays, reportDays, compliantDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
   const daily = reportDays.map(date => `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))} ${mark(completedDays.has(date))}</td></tr>`);
   return reportDocument("Laporan Bulanan PHC", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Hari patuh", `${number.format(compliantDays)}/${number.format(reportDays.length)}`)}${kpi("Hari dinilai", number.format(reportDays.length))}</section><section class="report-section daily-section"><h2>Pematuhan harian PHC</h2><p>✓ ada checklist · ✕ tiada checklist</p><table><thead><tr><th>Tarikh</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
 }
 
 function girnReport(meta) {
   const rows = monthlyRows(girn);
-  const completed = new Set(rows.map(row => `${recordDate(row)}:${shiftId(row.shift)}`).filter(key => !key.endsWith(":")));
-  const expected = meta.daysInMonth * shiftDefinitions.length;
-  const daily = meta.days.map(date => `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))}</td>${shiftDefinitions.map(shift => `<td>${shift.label} ${mark(completed.has(`${date}:${shift.id}`))}</td>`).join("")}</tr>`);
-  const rate = expected ? (completed.size / expected) * 100 : 0;
-  return reportDocument("Laporan Bulanan GIRN", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Pemeriksaan syif", `${number.format(completed.size)}/${number.format(expected)}`)}${kpi("Hari dalam bulan", number.format(meta.daysInMonth))}</section><section class="report-section daily-section"><h2>Catatan pemeriksaan GIRN</h2><p>✓ diperiksa · ✕ belum diperiksa</p><table><thead><tr><th>Tarikh</th><th>Syif pagi</th><th>Syif petang</th><th>Syif malam</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
+  const { completedDays, reportDays, compliantDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
+  const daily = reportDays.map(date => `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))} ${mark(completedDays.has(date))}</td></tr>`);
+  return reportDocument("Laporan Bulanan GIRN", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Hari patuh", `${number.format(compliantDays)}/${number.format(reportDays.length)}`)}${kpi("Hari dinilai", number.format(reportDays.length))}</section><section class="report-section daily-section"><h2>Pematuhan harian GIRN</h2><p>✓ ada checklist · ✕ tiada checklist</p><table><thead><tr><th>Tarikh</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
 }
 
 function generateMonthlyReport() {
@@ -476,6 +500,8 @@ printDialog.addEventListener("cancel", event => { event.preventDefault(); closeP
 window.addEventListener("afterprint", () => document.body.classList.remove("printing"));
 document.querySelector("#logoutBtn").addEventListener("click", async () => { state.stops.forEach(stop => stop()); await logout(); location.href = "../"; });
 selectAllActions.addEventListener("change", () => { const items = actionItems(); selectAllActions.checked ? items.forEach(item => state.selectedActions.add(item.key)) : state.selectedActions.clear(); renderActions(); });
+selectAllDailyVerifications.addEventListener("change", () => { state.selectedDailyVerifications = selectAllDailyVerificationKeys(dailyVerificationItems(), selectAllDailyVerifications.checked); renderActions(); });
+verifySelectedDailyBtn.addEventListener("click", () => verifyDailyVerifications([...state.selectedDailyVerifications]));
 ackSelectedBtn.addEventListener("click", () => runSelectedAction("acknowledge"));
 verifySelectedBtn.addEventListener("click", () => runSelectedAction("verify"));
 window.addEventListener("beforeunload", () => state.stops.forEach(stop => stop()));

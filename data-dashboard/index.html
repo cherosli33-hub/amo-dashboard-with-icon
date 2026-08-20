@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
   <title>Dashboard Penerima · AMO Dashboard v2</title>
-  <link rel="stylesheet" href="./styles.css?v=7">
+  <link rel="stylesheet" href="./styles.css?v=8">
 </head>
 <body>
   <header class="topbar no-print">
@@ -66,12 +66,23 @@
           <div>
             <p class="eyebrow">SUPERVISOR CENTRE</p>
             <h2 id="supervisorTitle">Pengesahan & tindakan penyelia</h2>
-            <p class="section-note">Restock kekal di modul PHC. Di sini hanya pengesahan PHC sekali sehari, Tindakan Catatan dan isu modul lain.</p>
+            <p class="section-note">Restock kekal di modul PHC. Pengesahan PHC dan GIRN dibuat sekali bagi setiap tarikh.</p>
           </div>
           <strong id="actionCount" class="action-count">0</strong>
         </div>
 
-        <div id="phcDailyList" class="daily-verification-list"><p class="empty">Menunggu rekod PHC…</p></div>
+        <div class="daily-verification-toolbar">
+          <label class="select-all"><input id="selectAllDailyVerifications" type="checkbox"> <span>Pilih semua pengesahan PHC & GIRN</span></label>
+          <button id="verifySelectedDailyBtn" type="button" disabled>✓ Sahkan dipilih</button>
+        </div>
+        <section class="daily-module" aria-labelledby="phcVerificationTitle">
+          <h3 id="phcVerificationTitle">Pengesahan PHC</h3>
+          <div id="phcDailyList" class="daily-verification-list"><p class="empty">Menunggu rekod PHC…</p></div>
+        </section>
+        <section class="daily-module" aria-labelledby="girnVerificationTitle">
+          <h3 id="girnVerificationTitle">Pengesahan GIRN</h3>
+          <div id="girnDailyList" class="daily-verification-list"><p class="empty">Menunggu rekod GIRN…</p></div>
+        </section>
 
         <div class="action-toolbar">
           <label class="select-all"><input id="selectAllActions" type="checkbox"> <span>Pilih semua tindakan tertunggak</span></label>
@@ -115,6 +126,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=7"></script>
+  <script type="module" src="./app.js?v=8"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPhcDailyStates, buildPhcMonthlySummary } from "../data-dashboard/modules/phc-summary.mjs";
+import { buildDailyComplianceSummary, buildDailyVerificationStates, buildPhcDailyStates, buildPhcMonthlySummary, selectAllDailyVerificationKeys } from "../data-dashboard/modules/phc-summary.mjs";
 
 const recordDate = row => row.date || "";
 
@@ -26,6 +26,34 @@ test("rekod lewat masih tertunggak walaupun tarikh sama pernah diaudit", () => {
   assert.deepEqual(state.unverified.map(row => row.id), ["late"]);
 });
 
+test("rekod GIRN dikumpulkan mengikut tarikh untuk pengesahan penyelia", () => {
+  const rows = [
+    { id:"morning", date:"2026-08-20", shift:"morning" },
+    { id:"evening", date:"2026-08-20", shift:"evening" },
+    { id:"yesterday", date:"2026-08-19", shift:"night", verified:true }
+  ];
+  const states = buildDailyVerificationStates(rows, [], "girn-daily", recordDate);
+  assert.deepEqual(states.filter(day => !day.complete).map(day => day.date), ["2026-08-20"]);
+  assert.equal(states[0].unverified.length, 2);
+});
+
+test("audit GIRN lama tidak menutup rekod GIRN lewat", () => {
+  const rows = [
+    { id:"old", date:"2026-08-20", verified:true },
+    { id:"late", date:"2026-08-20", verified:false }
+  ];
+  const audits = [{ sourceModule:"girn-daily", sourceDate:"2026-08-20" }];
+  const [state] = buildDailyVerificationStates(rows, audits, "girn-daily", recordDate);
+  assert.equal(state.complete, false);
+  assert.deepEqual(state.unverified.map(row => row.id), ["late"]);
+});
+
+test("pilih semua merangkumi pengesahan PHC dan GIRN", () => {
+  const items = [{ key:"phc:2026-08-19" }, { key:"girn:2026-08-19" }, { key:"girn:2026-08-20" }];
+  assert.deepEqual([...selectAllDailyVerificationKeys(items, true)], items.map(item => item.key));
+  assert.equal(selectAllDailyVerificationKeys(items, false).size, 0);
+});
+
 test("satu checklist pada mana-mana syif menjadikan hari itu patuh", () => {
   const days = Array.from({ length:31 }, (_, index) => `2026-08-${String(index + 1).padStart(2, "0")}`);
   const rows = [
@@ -43,4 +71,17 @@ test("tarikh akan datang tidak dimasukkan dalam pematuhan bulan semasa", () => {
   const summary = buildPhcMonthlySummary([], { value:"2026-08", days }, "2026-08-20", recordDate);
   assert.equal(summary.reportDays.at(-1), "2026-08-20");
   assert.equal(summary.reportDays.includes("2026-08-21"), false);
+});
+
+test("laporan GIRN mengira satu checklist pada mana-mana syif sebagai satu hari patuh", () => {
+  const days = Array.from({ length:31 }, (_, index) => `2026-08-${String(index + 1).padStart(2, "0")}`);
+  const rows = [
+    { date:"2026-08-18", shift:"night" },
+    { date:"2026-08-20", shift:"morning" },
+    { date:"2026-08-20", shift:"evening" }
+  ];
+  const summary = buildDailyComplianceSummary(rows, { value:"2026-08", days }, "2026-08-20", recordDate);
+  assert.equal(summary.reportDays.length, 20);
+  assert.equal(summary.compliantDays, 2);
+  assert.equal(summary.completedDays.size, 2);
 });
