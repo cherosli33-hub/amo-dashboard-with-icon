@@ -11,6 +11,7 @@ import girn from "./modules/girn.js";
 import phcFindings from "./modules/phc-findings.js";
 import girnFindings from "./modules/girn-findings.js";
 import supervisorAudit from "./modules/supervisor-audit.js";
+import { buildPhcDailyStates, buildPhcMonthlySummary } from "./modules/phc-summary.mjs";
 
 const primaryModules = [procedure, asthma, phc, girn];
 const modules = [...primaryModules, phcFindings, girnFindings, supervisorAudit];
@@ -42,7 +43,7 @@ const actionStatus = document.querySelector("#actionStatus");
 const selectAllActions = document.querySelector("#selectAllActions");
 const ackSelectedBtn = document.querySelector("#ackSelectedBtn");
 const verifySelectedBtn = document.querySelector("#verifySelectedBtn");
-const verifyPhcDayBtn = document.querySelector("#verifyPhcDayBtn");
+const phcDailyList = document.querySelector("#phcDailyList");
 const printDialog = document.querySelector("#printDialog");
 let sessionUser = null;
 let sessionProfile = null;
@@ -228,38 +229,30 @@ function actionBadgeFor(module, row) {
   return "Perlu tindakan";
 }
 
-function phcDailyState() {
-  const records = todayRows(phc);
-  const unverified = records.filter(row => row.verified !== true);
-  const audit = rowsFor(supervisorAudit).find(row => row.sourceModule === "phc-daily" && (row.sourceDate === localDateKey() || recordDate(row) === localDateKey()));
-  return { records, unverified, audit, complete:Boolean(records.length && (!unverified.length || audit)) };
+function phcDailyStates() {
+  return buildPhcDailyStates(rowsFor(phc), rowsFor(supervisorAudit), recordDate);
 }
 
 function renderPhcDaily() {
-  const daily = phcDailyState();
-  const title = document.querySelector("#phcDailyTitle");
-  const detail = document.querySelector("#phcDailyDetail");
-  const card = document.querySelector("#phcDailyCard");
-  card.classList.toggle("complete", daily.complete);
-  if (!daily.records.length) {
-    title.textContent = "Belum ada rekod PHC hari ini";
-    detail.textContent = "Pengesahan tersedia selepas pemeriksaan diterima.";
-  } else if (daily.complete) {
-    title.textContent = `Pengesahan hari ini selesai · ${daily.records.length} rekod`;
-    detail.textContent = daily.audit?.actorName ? `Disahkan oleh ${daily.audit.actorName}.` : `Semua rekod telah disahkan.`;
-  } else {
-    title.textContent = `${daily.records.length} rekod PHC sedia untuk pengesahan harian`;
-    detail.textContent = `${daily.unverified.length} belum disahkan · satu klik mengesahkan keseluruhan hari.`;
+  const days = phcDailyStates();
+  const pending = days.filter(day => !day.complete);
+  if (!pending.length) {
+    const today = days.find(day => day.date === localDateKey());
+    phcDailyList.innerHTML = today ? `<article class="daily-verification complete"><div class="daily-icon" aria-hidden="true">PHC</div><div class="daily-copy"><small>PENGESAHAN HARIAN</small><strong>Pengesahan hari ini selesai · ${number.format(today.records.length)} rekod</strong><span>${today.audit?.actorName ? `Disahkan oleh ${escapeHtml(today.audit.actorName)}.` : "Semua rekod telah disahkan."}</span></div><button type="button" disabled>✓ Sudah disahkan</button></article>` : `<div class="action-empty">Belum ada rekod PHC untuk pengesahan.</div>`;
+    return;
   }
-  verifyPhcDayBtn.textContent = daily.complete ? "✓ Sudah disahkan" : "Sahkan hari ini";
-  verifyPhcDayBtn.disabled = state.acting || !daily.records.length || daily.complete;
+  phcDailyList.innerHTML = pending.map(day => {
+    const dateLabel = new Date(`${day.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"short", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
+    return `<article class="daily-verification"><div class="daily-icon" aria-hidden="true">PHC</div><div class="daily-copy"><small>PENGESAHAN TERTUNGGAK</small><strong>${escapeHtml(dateLabel)} · ${number.format(day.records.length)} rekod</strong><span>${number.format(day.unverified.length)} rekod belum disahkan.</span></div><button type="button" data-phc-date="${escapeHtml(day.date)}" ${state.acting ? "disabled" : ""}>Sahkan</button></article>`;
+  }).join("");
+  phcDailyList.querySelectorAll("[data-phc-date]").forEach(button => button.addEventListener("click", () => verifyPhcDay(button.dataset.phcDate)));
 }
 
 function renderActions() {
   const items = actionItems();
   const existing = new Set(items.map(item => item.key));
   [...state.selectedActions].forEach(key => { if (!existing.has(key)) state.selectedActions.delete(key); });
-  actionCount.textContent = number.format(items.length + (phcDailyState().records.length && !phcDailyState().complete ? 1 : 0));
+  actionCount.textContent = number.format(items.length + phcDailyStates().filter(day => !day.complete).length);
   actionList.innerHTML = items.length ? items.map(({ module, row, key }) => `<label class="action-item ${state.selectedActions.has(key) ? "selected" : ""}"><span class="action-check"><input type="checkbox" data-action-key="${escapeHtml(key)}" ${state.selectedActions.has(key) ? "checked" : ""}></span><span class="action-copy"><strong>${escapeHtml(actionTitleFor(module, row))}</strong><span>${escapeHtml(actionDetailFor(module, row) || "Tiada catatan tambahan")}</span></span><span class="action-badge">${escapeHtml(actionBadgeFor(module, row))}</span></label>`).join("") : `<div class="action-empty">✓ Tiada Tindakan Catatan atau isu modul yang tertunggak.</div>`;
   actionList.querySelectorAll("[data-action-key]").forEach(input => input.addEventListener("change", () => { input.checked ? state.selectedActions.add(input.dataset.actionKey) : state.selectedActions.delete(input.dataset.actionKey); renderActions(); }));
   const selectedCount = state.selectedActions.size;
@@ -303,10 +296,12 @@ async function runSelectedAction(mode) {
   finally { state.acting = false; renderActions(); }
 }
 
-async function verifyPhcDay() {
-  const daily = phcDailyState();
+async function verifyPhcDay(date) {
+  const daily = phcDailyStates().find(day => day.date === date);
+  if (!daily) return;
   if (state.acting || daily.complete || !daily.records.length) return;
-  if (!confirm(`Sahkan keseluruhan ${daily.records.length} rekod PHC untuk hari ini? Pengesahan ini dibuat sekali sehari.`)) return;
+  const dateLabel = new Date(`${daily.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
+  if (!confirm(`Sahkan keseluruhan ${daily.records.length} rekod PHC untuk ${dateLabel}? Pengesahan ini dibuat sekali bagi tarikh tersebut.`)) return;
   state.acting = true; actionStatus.textContent = "Menyimpan pengesahan PHC harian…"; renderActions();
   try {
     const chunks = [];
@@ -315,10 +310,10 @@ async function verifyPhcDay() {
       const chunk = chunks[chunkIndex];
       const batch = writeBatch(db);
       chunk.forEach(row => batch.update(doc(db, phc.collection, row.id), { verified:true, verifiedBy:actorName(), verifiedEmail:sessionUser?.email || sessionProfile?.email || "", verifiedAt:serverTimestamp() }));
-      if (chunkIndex === chunks.length - 1) batch.set(doc(collection(db, COLLECTIONS.actionTasks)), { recordType:"audit", status:"completed", state:"completed", sourceCollection:phc.collection, sourceModule:"phc-daily", sourceDate:localDateKey(), sourceTitle:`Pengesahan PHC harian ${localDateKey()}`, sourceDetail:`${daily.records.length} rekod disahkan sekali untuk keseluruhan hari`, recordIds:daily.records.map(row => row.id), actionType:"daily-verify", actionLabel:"Pengesahan harian", actorUid:sessionUser?.uid || "", actorName:actorName(), actorEmail:sessionUser?.email || sessionProfile?.email || "", actorRole:sessionProfile?.role || "", actedAt:serverTimestamp() });
+      if (chunkIndex === chunks.length - 1) batch.set(doc(collection(db, COLLECTIONS.actionTasks)), { recordType:"audit", status:"completed", state:"completed", sourceCollection:phc.collection, sourceModule:"phc-daily", sourceDate:daily.date, sourceTitle:`Pengesahan PHC harian ${daily.date}`, sourceDetail:`${daily.records.length} rekod disahkan sekali untuk keseluruhan hari`, recordIds:daily.records.map(row => row.id), actionType:"daily-verify", actionLabel:"Pengesahan harian", actorUid:sessionUser?.uid || "", actorName:actorName(), actorEmail:sessionUser?.email || sessionProfile?.email || "", actorRole:sessionProfile?.role || "", actedAt:serverTimestamp() });
       await batch.commit();
     }
-    actionStatus.textContent = `${daily.records.length} rekod PHC disahkan sekali untuk hari ini oleh ${actorName()}.`;
+    actionStatus.textContent = `${daily.records.length} rekod PHC bagi ${dateLabel} disahkan oleh ${actorName()}.`;
   } catch (error) { console.error("Pengesahan PHC harian gagal", error); actionStatus.textContent = error.message || "Pengesahan harian gagal disimpan."; }
   finally { state.acting = false; renderActions(); }
 }
@@ -421,22 +416,11 @@ function asthmaReport(meta) {
   return reportDocument("Laporan Bulanan Asthma", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size))}${kpi("Jumlah penilaian", number.format(rows.length))}${kpi("Before + After lengkap", rows.length ? `${((complete / rows.length) * 100).toFixed(1)}%` : "0.0%", `${complete}/${rows.length}`)}${kpi("PEFR tidak dibuat", number.format(notDone))}${kpi("Uptriage", number.format(uptriage))}</section><section class="report-section"><h2>Ringkasan setiap pesakit</h2><table><thead><tr><th>Tarikh</th><th>Pesakit / IC-RN</th><th>Kategori</th><th>Penilaian</th><th>Before → After</th><th>Lengkap</th><th>Uptriage</th></tr></thead><tbody>${patientRows.length ? patientRows.join("") : `<tr><td colspan="7" class="print-empty">Tiada penilaian Asthma direkodkan bagi bulan ini.</td></tr>`}</tbody></table></section>`);
 }
 
-function phcBagId(value) {
-  const match = String(value || "").match(/(?:phc|beg)?\s*([12])/i);
-  return match?.[1] || "";
-}
-
 function phcReport(meta) {
   const rows = monthlyRows(phc);
-  const completed = new Set(rows.map(row => `${recordDate(row)}:${phcBagId(row.bag)}:${shiftId(row.shift)}`).filter(key => !key.includes("::") && !/:$/.test(key)));
-  const expected = meta.daysInMonth * 2 * shiftDefinitions.length;
-  const daily = meta.days.map(date => {
-    const bagDone = bag => shiftDefinitions.every(shift => completed.has(`${date}:${bag}:${shift.id}`));
-    const shiftDone = shift => ["1", "2"].every(bag => completed.has(`${date}:${bag}:${shift.id}`));
-    return `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))}</td><td>PHC 1 ${mark(bagDone("1"))}</td><td>PHC 2 ${mark(bagDone("2"))}</td>${shiftDefinitions.map(shift => `<td>${shift.label} ${mark(shiftDone(shift))}</td>`).join("")}</tr>`;
-  });
-  const rate = expected ? (completed.size / expected) * 100 : 0;
-  return reportDocument("Laporan Bulanan PHC", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Pemeriksaan lengkap", `${number.format(completed.size)}/${number.format(expected)}`)}${kpi("Hari dalam bulan", number.format(meta.daysInMonth))}</section><section class="report-section daily-section"><h2>Catatan harian PHC</h2><p>✓ lengkap · ✕ belum lengkap</p><table><thead><tr><th>Tarikh</th><th>PHC 1</th><th>PHC 2</th><th>Syif pagi</th><th>Syif petang</th><th>Syif malam</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
+  const { completedDays, reportDays, compliantDays, rate } = buildPhcMonthlySummary(rows, meta, localDateKey(), recordDate);
+  const daily = reportDays.map(date => `<tr><td>${escapeHtml(new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY"))} ${mark(completedDays.has(date))}</td></tr>`);
+  return reportDocument("Laporan Bulanan PHC", meta, `<section class="report-kpis">${kpi("Kadar pematuhan", `${rate.toFixed(1)}%`)}${kpi("Hari patuh", `${number.format(compliantDays)}/${number.format(reportDays.length)}`)}${kpi("Hari dinilai", number.format(reportDays.length))}</section><section class="report-section daily-section"><h2>Pematuhan harian PHC</h2><p>✓ ada checklist · ✕ tiada checklist</p><table><thead><tr><th>Tarikh</th></tr></thead><tbody>${daily.join("")}</tbody></table></section>`);
 }
 
 function girnReport(meta) {
@@ -494,7 +478,6 @@ document.querySelector("#logoutBtn").addEventListener("click", async () => { sta
 selectAllActions.addEventListener("change", () => { const items = actionItems(); selectAllActions.checked ? items.forEach(item => state.selectedActions.add(item.key)) : state.selectedActions.clear(); renderActions(); });
 ackSelectedBtn.addEventListener("click", () => runSelectedAction("acknowledge"));
 verifySelectedBtn.addEventListener("click", () => runSelectedAction("verify"));
-verifyPhcDayBtn.addEventListener("click", verifyPhcDay);
 window.addEventListener("beforeunload", () => state.stops.forEach(stop => stop()));
 
 await prepareAuth();

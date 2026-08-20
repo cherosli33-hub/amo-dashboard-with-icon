@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
   <title>Dashboard Penerima · AMO Dashboard v2</title>
-  <link rel="stylesheet" href="./styles.css?v=6">
+  <link rel="stylesheet" href="./styles.css?v=7">
 </head>
 <body>
   <header class="topbar no-print">
@@ -71,11 +71,7 @@
           <strong id="actionCount" class="action-count">0</strong>
         </div>
 
-        <article id="phcDailyCard" class="daily-verification">
-          <div class="daily-icon" aria-hidden="true">PHC</div>
-          <div class="daily-copy"><small>PENGESAHAN HARIAN</small><strong id="phcDailyTitle">Menunggu rekod PHC…</strong><span id="phcDailyDetail">Pengesahan dibuat sekali untuk keseluruhan hari.</span></div>
-          <button id="verifyPhcDayBtn" type="button" disabled>Sahkan hari ini</button>
-        </article>
+        <div id="phcDailyList" class="daily-verification-list"><p class="empty">Menunggu rekod PHC…</p></div>
 
         <div class="action-toolbar">
           <label class="select-all"><input id="selectAllActions" type="checkbox"> <span>Pilih semua tindakan tertunggak</span></label>
@@ -119,6 +115,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=6"></script>
+  <script type="module" src="./app.js?v=7"></script>
 </body>
 </html>
