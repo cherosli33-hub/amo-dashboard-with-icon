@@ -1,5 +1,5 @@
 const style=document.createElement("style");
-style.textContent=`.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}.amo-central-action-note{margin:10px 0;padding:10px 12px;border-radius:9px;background:#eef7f4;color:#185f55;font-size:12px;font-weight:700}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}}`;
+style.textContent=`.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}.amo-central-action-note{margin:10px 0;padding:10px 12px;border-radius:9px;background:#eef7f4;color:#185f55;font-size:12px;font-weight:700}.amo-findings-empty{padding:28px 18px;text-align:center;border:1px dashed #c9ddd7;border-radius:14px;background:#f8fbfa;color:#527068}.amo-findings-empty strong{display:block;margin-bottom:5px;color:#174f46}.filter-tabs .amo-latest-tab{pointer-events:none}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}}`;
 document.head.appendChild(style);
 if(!document.body) await new Promise(resolve=>document.addEventListener("DOMContentLoaded",resolve,{once:true}));
 
@@ -34,6 +34,50 @@ async function addWeeklyAudit(){
   }catch(error){ panel.querySelector("p").textContent=error.message||"Data mingguan gagal dimuatkan."; }
 }
 
+function showLatestFindingsOnly(){
+  const pageHeading=[...document.querySelectorAll("h2")].find(node=>String(node.textContent||"").trim()==="Daftar Penemuan");
+  const introHeading=[...document.querySelectorAll("h3")].find(node=>String(node.textContent||"").trim()==="Susulan penemuan"||String(node.textContent||"").trim()==="Penemuan terbaru");
+  if(!pageHeading&&!introHeading) return;
+
+  if(introHeading){
+    introHeading.textContent="Penemuan terbaru";
+    const description=introHeading.parentElement?.querySelector("p");
+    if(description) description.textContent="Hanya penemuan baharu yang belum diambil maklum dipaparkan di sini.";
+  }
+
+  const tabs=document.querySelector(".filter-tabs");
+  if(tabs&&!tabs.querySelector(".amo-latest-tab")){
+    tabs.replaceChildren();
+    const tab=document.createElement("button");
+    tab.type="button";
+    tab.className="active amo-latest-tab";
+    tab.textContent="Penemuan terbaru";
+    tab.setAttribute("aria-current","page");
+    tabs.appendChild(tab);
+  }
+
+  const list=document.querySelector(".finding-list");
+  if(!list) return;
+  let visible=0;
+  list.querySelectorAll(".finding-card").forEach(card=>{
+    const badge=String(card.querySelector(".badge")?.textContent||"").trim().toLocaleLowerCase("ms-MY");
+    const text=String(card.textContent||"").toLocaleLowerCase("ms-MY");
+    const isNew=badge==="baharu"&&!text.includes("diambil maklum oleh")&&!text.includes("rekod ditutup");
+    card.hidden=!isNew;
+    if(isNew) visible+=1;
+  });
+
+  let empty=list.querySelector(".amo-findings-empty");
+  if(!visible){
+    if(!empty){
+      empty=document.createElement("div");
+      empty.className="amo-findings-empty";
+      empty.innerHTML="<strong>Tiada penemuan terbaru</strong><span>Tiada penemuan baharu yang belum diambil maklum.</span>";
+      list.appendChild(empty);
+    }
+  }else empty?.remove();
+}
+
 function removeLocalSupervisorActions(){
   const actionWords=["ambil maklum","diambil maklum","tandakan selesai","sahkan","selesaikan penemuan"];
   document.querySelectorAll("button").forEach(button=>{
@@ -51,10 +95,10 @@ function removeLocalSupervisorActions(){
 }
 
 // Tindakan penyelia sengaja tidak lagi dibuat dalam app GIRN.
-// Penemuan kekal boleh dilihat, tetapi tindakan dibuat di Dashboard Penerima.
-const observer=new MutationObserver(()=>{ void addWeeklyAudit(); removeLocalSupervisorActions(); });
+// Paparan Penemuan hanya menunjukkan penemuan baharu yang belum diambil maklum.
+const observer=new MutationObserver(()=>{ void addWeeklyAudit(); showLatestFindingsOnly(); removeLocalSupervisorActions(); });
 observer.observe(document.body,{childList:true,subtree:true});
-void addWeeklyAudit(); removeLocalSupervisorActions();
+void addWeeklyAudit(); showLatestFindingsOnly(); removeLocalSupervisorActions();
 
 let initialStreams=0;
 let reloadTimer=null;
