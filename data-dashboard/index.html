@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
   <title>Dashboard Penerima · AMO Dashboard v2</title>
-  <link rel="stylesheet" href="./styles.css?v=10">
+  <link rel="stylesheet" href="./styles.css?v=11">
 </head>
 <body>
   <header class="topbar no-print">
@@ -71,6 +71,13 @@
           <strong id="actionCount" class="action-count">0</strong>
         </div>
 
+        <button id="supervisorFolderToggle" class="folder-toggle" type="button" aria-expanded="false" aria-controls="supervisorFolderContent">
+          <span class="folder-icon" aria-hidden="true"></span>
+          <span><strong>Senarai pengesahan & tindakan</strong><small>Klik untuk melihat semua perkara yang perlu diambil tindakan.</small></span>
+          <b class="folder-label">Buka</b><i aria-hidden="true">⌄</i>
+        </button>
+
+        <div id="supervisorFolderContent" class="supervisor-folder-content" hidden>
         <div class="daily-verification-toolbar">
           <label class="select-all"><input id="selectAllDailyVerifications" type="checkbox"> <span>Pilih semua pengesahan PHC & GIRN</span></label>
           <button id="verifySelectedDailyBtn" type="button" disabled>✓ Sahkan dipilih</button>
@@ -93,6 +100,7 @@
         </div>
         <p id="actionStatus" class="action-status" role="status"></p>
         <div id="actionList" class="action-list"><p class="empty">Menunggu data tindakan…</p></div>
+        </div>
       </section>
 
       <section class="panel data-panel report-centre" aria-labelledby="monthlyReportTitle">
@@ -126,7 +134,7 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=10"></script>
+  <script type="module" src="./app.js?v=11"></script>
   <script type="module" src="./findings-report-enhancement.js?v=1"></script>
 </body>
 </html>

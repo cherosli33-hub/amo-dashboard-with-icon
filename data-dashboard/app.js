@@ -47,6 +47,8 @@ const phcDailyList = document.querySelector("#phcDailyList");
 const girnDailyList = document.querySelector("#girnDailyList");
 const selectAllDailyVerifications = document.querySelector("#selectAllDailyVerifications");
 const verifySelectedDailyBtn = document.querySelector("#verifySelectedDailyBtn");
+const supervisorFolderToggle = document.querySelector("#supervisorFolderToggle");
+const supervisorFolderContent = document.querySelector("#supervisorFolderContent");
 const printDialog = document.querySelector("#printDialog");
 let sessionUser = null;
 let sessionProfile = null;
@@ -399,6 +401,10 @@ function signatureBlock() {
   return `<section class="signature-block"><div><span>Disahkan oleh Penyelia</span><strong>&nbsp;</strong><small>Nama dan tandatangan</small></div><div><span>Tarikh pengesahan</span><strong>&nbsp;</strong><small>Tarikh</small></div></section>`;
 }
 
+function reportFolder(title, itemCount, content) {
+  return `<details class="report-folder"><summary><span class="folder-icon" aria-hidden="true"></span><span><strong>${escapeHtml(title)}</strong><small>Klik untuk melihat senarai lengkap.</small></span><b>${escapeHtml(number.format(itemCount))} item</b><i aria-hidden="true">⌄</i></summary><div class="report-folder-content">${content}</div></details>`;
+}
+
 function reportDocument(title, meta, body) {
   return `<div class="monthly-document"><header class="print-head"><div class="print-brand">AMO</div><div><small>HOSPITAL KUALA LIPIS · JABATAN KECEMASAN & TRAUMA</small><h1>${escapeHtml(title)}</h1><p>${escapeHtml(meta.label)}</p></div><dl><dt>Dijana</dt><dd>${escapeHtml(new Date().toLocaleString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", dateStyle:"medium", timeStyle:"short" }))}</dd><dt>Oleh</dt><dd>${escapeHtml(roleLabel())}</dd></dl></header>${body}${signatureBlock()}<footer>Dashboard Penerima AMO v2 · Ringkasan bulanan</footer></div>`;
 }
@@ -415,7 +421,8 @@ function procedureReport(meta) {
   const totalProcedures = [...totals.values()].reduce((sum, value) => sum + value, 0);
   const patients = new Set(rows.map(row => String(row.registrationNumber || row.patientId || row.id || "").trim()).filter(Boolean));
   const bodyRows = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ms-MY"));
-  return reportDocument("Laporan Bulanan Prosedur", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size || rows.length))}${kpi("Jumlah prosedur", number.format(totalProcedures))}${kpi("Jenis prosedur", number.format(totals.size))}</section><section class="report-section"><h2>Ringkasan prosedur</h2><table><thead><tr><th>Prosedur</th><th>Jumlah</th><th>Peratus</th></tr></thead><tbody>${bodyRows.length ? bodyRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${number.format(count)}</td><td>${totalProcedures ? ((count / totalProcedures) * 100).toFixed(1) : "0.0"}%</td></tr>`).join("") : `<tr><td colspan="3" class="print-empty">Tiada prosedur direkodkan bagi bulan ini.</td></tr>`}</tbody><tfoot><tr><th>Jumlah keseluruhan</th><th>${number.format(totalProcedures)}</th><th>100%</th></tr></tfoot></table></section>`);
+  const detail = `<section class="report-section"><h2>Ringkasan prosedur</h2><table><thead><tr><th>Prosedur</th><th>Jumlah</th><th>Peratus</th></tr></thead><tbody>${bodyRows.length ? bodyRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${number.format(count)}</td><td>${totalProcedures ? ((count / totalProcedures) * 100).toFixed(1) : "0.0"}%</td></tr>`).join("") : `<tr><td colspan="3" class="print-empty">Tiada prosedur direkodkan bagi bulan ini.</td></tr>`}</tbody><tfoot><tr><th>Jumlah keseluruhan</th><th>${number.format(totalProcedures)}</th><th>100%</th></tr></tfoot></table></section>`;
+  return reportDocument("Laporan Bulanan Prosedur", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size || rows.length))}${kpi("Jumlah prosedur", number.format(totalProcedures))}${kpi("Jenis prosedur", number.format(totals.size))}</section>${reportFolder("Perincian prosedur bulanan", bodyRows.length, detail)}`);
 }
 
 function asthmaReport(meta) {
@@ -435,7 +442,8 @@ function asthmaReport(meta) {
     const dateRange = recordDate(first) === recordDate(last) ? recordDate(last) : `${recordDate(first)} – ${recordDate(last)}`;
     return `<tr><td>${escapeHtml(dateRange)}</td><td><strong>${escapeHtml(patient.name)}</strong><small>${escapeHtml(patient.id)}</small></td><td>${escapeHtml(patient.type)}</td><td>${number.format(patient.rows.length)}</td><td>${escapeHtml(last.categoryBefore || "—")} → ${escapeHtml(last.categoryAfter || "—")}</td><td>${completeCount}/${patient.rows.length}</td><td>${escapeHtml(last.uptriage || "Tiada")}</td></tr>`;
   });
-  return reportDocument("Laporan Bulanan Asthma", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size))}${kpi("Jumlah penilaian", number.format(rows.length))}${kpi("Before + After lengkap", rows.length ? `${((complete / rows.length) * 100).toFixed(1)}%` : "0.0%", `${complete}/${rows.length}`)}${kpi("PEFR tidak dibuat", number.format(notDone))}${kpi("Uptriage", number.format(uptriage))}</section><section class="report-section"><h2>Ringkasan setiap pesakit</h2><table><thead><tr><th>Tarikh</th><th>Pesakit / IC-RN</th><th>Kategori</th><th>Penilaian</th><th>Before → After</th><th>Lengkap</th><th>Uptriage</th></tr></thead><tbody>${patientRows.length ? patientRows.join("") : `<tr><td colspan="7" class="print-empty">Tiada penilaian Asthma direkodkan bagi bulan ini.</td></tr>`}</tbody></table></section>`);
+  const detail = `<section class="report-section"><h2>Ringkasan setiap pesakit</h2><table><thead><tr><th>Tarikh</th><th>Pesakit / IC-RN</th><th>Kategori</th><th>Penilaian</th><th>Before → After</th><th>Lengkap</th><th>Uptriage</th></tr></thead><tbody>${patientRows.length ? patientRows.join("") : `<tr><td colspan="7" class="print-empty">Tiada penilaian Asthma direkodkan bagi bulan ini.</td></tr>`}</tbody></table></section>`;
+  return reportDocument("Laporan Bulanan Asthma", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size))}${kpi("Jumlah penilaian", number.format(rows.length))}${kpi("Before + After lengkap", rows.length ? `${((complete / rows.length) * 100).toFixed(1)}%` : "0.0%", `${complete}/${rows.length}`)}${kpi("PEFR tidak dibuat", number.format(notDone))}${kpi("Uptriage", number.format(uptriage))}</section>${reportFolder("Perincian penilaian bulanan", patientRows.length, detail)}`);
 }
 
 function reportStatus(tone, symbol, label) {
@@ -517,7 +525,9 @@ function dailyChecklistReport(module, title, meta) {
     return `<tr><td><strong>${escapeHtml(dateLabel)}</strong></td><td>${checklistStatus}</td><td>${verificationStatus}</td><td class="record-count">${number.format(day.recordCount)}</td><td>${findingText}</td></tr>`;
   }).join("");
   const emptyRow = `<tr><td colspan="5" class="print-empty">Tiada tarikh untuk dinilai bagi bulan ini.</td></tr>`;
-  return reportDocument(title, meta, `<section class="report-kpis daily-report-kpis">${kpi("Hari dinilai", number.format(reportDays.length), "Tarikh hingga hari ini", "info")}${kpi("Hari patuh", number.format(compliantDays), "Dibuat dan disahkan", "good")}${kpi("Belum disahkan", number.format(pendingVerificationDays), "Menunggu penyelia", "pending")}${kpi("Tidak dibuat", number.format(missingDays), "Tiada checklist", "missing")}${kpi("Pematuhan", `${rate.toFixed(1)}%`, `${number.format(compliantDays)}/${number.format(reportDays.length)} hari`, "info")}${kpi("Jumlah penemuan", number.format(findings.length), "Dalam bulan dipilih", "info")}${kpi("Belum diambil maklum", number.format(outstandingFindings), "Masih perlukan tindakan", "pending")}${kpi("Diambil maklum / selesai", number.format(acknowledgedOrDone), "Telah diproses", "good")}</section><section class="report-section daily-section"><h2>Status harian ${escapeHtml(module.label)}</h2><p>Ringkasan checklist, pengesahan penyelia dan jumlah penemuan bagi setiap tarikh.</p><table class="daily-report-table"><thead><tr><th>Tarikh</th><th>Status Checklist</th><th>Status Pengesahan</th><th>Bilangan Rekod</th><th>Penemuan</th></tr></thead><tbody>${daily || emptyRow}</tbody></table><p class="daily-report-legend"><strong>Patuh</strong> = sekurang-kurangnya satu checklist dibuat dan semua rekod pada tarikh tersebut telah disahkan.</p></section>${findingsDetailSection(module, findings)}`);
+  const dailyDetail = `<section class="report-section daily-section"><h2>Status harian ${escapeHtml(module.label)}</h2><p>Ringkasan checklist, pengesahan penyelia dan jumlah penemuan bagi setiap tarikh.</p><table class="daily-report-table"><thead><tr><th>Tarikh</th><th>Status Checklist</th><th>Status Pengesahan</th><th>Bilangan Rekod</th><th>Penemuan</th></tr></thead><tbody>${daily || emptyRow}</tbody></table><p class="daily-report-legend"><strong>Patuh</strong> = sekurang-kurangnya satu checklist dibuat dan semua rekod pada tarikh tersebut telah disahkan.</p></section>`;
+  const findingDetail = findingsDetailSection(module, findings);
+  return reportDocument(title, meta, `<section class="report-kpis daily-report-kpis">${kpi("Hari dinilai", number.format(reportDays.length), "Tarikh hingga hari ini", "info")}${kpi("Hari patuh", number.format(compliantDays), "Dibuat dan disahkan", "good")}${kpi("Belum disahkan", number.format(pendingVerificationDays), "Menunggu penyelia", "pending")}${kpi("Tidak dibuat", number.format(missingDays), "Tiada checklist", "missing")}${kpi("Pematuhan", `${rate.toFixed(1)}%`, `${number.format(compliantDays)}/${number.format(reportDays.length)} hari`, "info")}${kpi("Jumlah penemuan", number.format(findings.length), "Dalam bulan dipilih", "info")}${kpi("Belum diambil maklum", number.format(outstandingFindings), "Masih perlukan tindakan", "pending")}${kpi("Diambil maklum / selesai", number.format(acknowledgedOrDone), "Telah diproses", "good")}</section>${reportFolder(`Status harian ${module.label}`, dayStates.length, dailyDetail)}${reportFolder("Perincian penemuan bulanan", findings.length, findingDetail)}`);
 }
 
 function phcReport(meta) {
@@ -542,6 +552,7 @@ function generateMonthlyReport() {
 function openPrintPreview() {
   if (state.reportDirty || !state.reportHtml || state.reportMonth !== selectedMonthMeta().value) generateMonthlyReport();
   document.querySelector("#printReport").innerHTML = state.reportHtml;
+  document.querySelectorAll("#printReport .report-folder").forEach(folder => { folder.open = true; });
   document.querySelector("#previewHint").textContent = `${state.active.label} · ${selectedMonthMeta().label}`;
   document.body.classList.add("preview-open");
   requestAnimationFrame(() => printDialog.showModal());
@@ -573,6 +584,12 @@ window.addEventListener("afterprint", () => document.body.classList.remove("prin
 document.querySelector("#logoutBtn").addEventListener("click", async () => { state.stops.forEach(stop => stop()); await logout(); location.href = "../"; });
 selectAllActions.addEventListener("change", () => { const items = actionItems(); selectAllActions.checked ? items.forEach(item => state.selectedActions.add(item.key)) : state.selectedActions.clear(); renderActions(); });
 selectAllDailyVerifications.addEventListener("change", () => { state.selectedDailyVerifications = selectAllDailyVerificationKeys(dailyVerificationItems(), selectAllDailyVerifications.checked); renderActions(); });
+supervisorFolderToggle.addEventListener("click", () => {
+  const opening = supervisorFolderContent.hidden;
+  supervisorFolderContent.hidden = !opening;
+  supervisorFolderToggle.setAttribute("aria-expanded", String(opening));
+  supervisorFolderToggle.querySelector(".folder-label").textContent = opening ? "Tutup" : "Buka";
+});
 verifySelectedDailyBtn.addEventListener("click", () => verifyDailyVerifications([...state.selectedDailyVerifications]));
 ackSelectedBtn.addEventListener("click", () => runSelectedAction("acknowledge"));
 verifySelectedBtn.addEventListener("click", () => runSelectedAction("verify"));
