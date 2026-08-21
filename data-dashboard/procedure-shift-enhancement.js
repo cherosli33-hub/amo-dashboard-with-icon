@@ -4,6 +4,7 @@ import { COLLECTIONS } from "../shared/firebase/database.js";
 
 const TZ = "Asia/Kuala_Lumpur";
 let procedureRows = [];
+let girnRows = [];
 let frame = 0;
 
 function localParts(date = new Date()) {
@@ -40,12 +41,19 @@ function rowCalendarDate(row) {
   return date && !Number.isNaN(date.getTime()) ? dateKeyFromDate(date) : "";
 }
 
+function shiftId(value) {
+  const normalized = String(value || "").trim().toLocaleLowerCase("ms-MY");
+  if (normalized.includes("malam") || normalized.includes("night")) return "night";
+  if (normalized.includes("petang") || normalized.includes("evening") || normalized.includes("afternoon")) return "evening";
+  if (normalized.includes("pagi") || normalized.includes("morning")) return "morning";
+  return "";
+}
+
 function operationalDate(row) {
   const date = rowCalendarDate(row);
   if (!date) return "";
-  const shift = String(row.shift || "").trim().toLocaleLowerCase("ms-MY");
   const hour = rowClockHour(row);
-  const isNight = shift.includes("malam") || shift.includes("night");
+  const isNight = shiftId(row.shift) === "night";
   return isNight && hour != null && hour < 7 ? previousDateKey(date) : date;
 }
 
@@ -76,6 +84,41 @@ function patchProcedureCard() {
   if (note) note.textContent = "Hari operasi 07:00 – 06:59";
 }
 
+function patchGirnCard() {
+  const cards = document.querySelectorAll("#moduleCards .module-card");
+  const card = [...cards].find(node => node.querySelector(".module-icon")?.textContent.trim() === "GI");
+  if (!card) return;
+  const dayRows = girnRows.filter(row => operationalDate(row) === currentOperationalDate());
+  const shifts = new Set(dayRows.map(row => shiftId(row.shift)).filter(Boolean));
+  const value = card.querySelector(".module-copy strong");
+  const label = card.querySelector(".module-copy span");
+  if (value) value.textContent = `${shifts.size}/3`;
+  if (label) label.textContent = "syif diperiksa";
+}
+
+function patchGirnShiftCards() {
+  const dayRows = girnRows.filter(row => operationalDate(row) === currentOperationalDate());
+  const done = new Set(dayRows.map(row => shiftId(row.shift)).filter(Boolean));
+  const cards = [...document.querySelectorAll("#shiftCards .shift-card")];
+  const ids = ["morning", "evening", "night"];
+  cards.forEach((card, index) => {
+    const id = ids[index];
+    if (!id) return;
+    const lines = [...card.querySelectorAll("small")];
+    const girnLine = lines.find(line => /GIRN/i.test(line.textContent || ""));
+    if (!girnLine) return;
+    const isDone = done.has(id);
+    const icon = girnLine.querySelector("i");
+    if (icon) {
+      icon.className = isDone ? "done" : "pending";
+      icon.textContent = isDone ? "✓" : "·";
+    }
+    girnLine.childNodes.forEach(node => {
+      if (node.nodeType === Node.TEXT_NODE && /GIRN/i.test(node.textContent || "")) node.textContent = ` GIRN ${isDone ? "selesai" : "belum"}`;
+    });
+  });
+}
+
 function patchHeaderShift() {
   const context = document.querySelector("#todayContext");
   if (!context) return;
@@ -88,6 +131,8 @@ function schedulePatch() {
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
     patchProcedureCard();
+    patchGirnCard();
+    patchGirnShiftCards();
     patchHeaderShift();
   });
 }
@@ -95,10 +140,15 @@ function schedulePatch() {
 const observer = new MutationObserver(schedulePatch);
 observer.observe(document.body, { childList:true, subtree:true, characterData:true });
 
-const stop = onSnapshot(query(collection(db, COLLECTIONS.procedure), limit(5000)), snapshot => {
+const stopProcedure = onSnapshot(query(collection(db, COLLECTIONS.procedure), limit(5000)), snapshot => {
   procedureRows = snapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
   schedulePatch();
 }, error => console.error("Gagal menyelaras kiraan syif Prosedur", error));
 
+const stopGirn = onSnapshot(query(collection(db, COLLECTIONS.girn), limit(5000)), snapshot => {
+  girnRows = snapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
+  schedulePatch();
+}, error => console.error("Gagal menyelaras kiraan syif GIRN", error));
+
 schedulePatch();
-window.addEventListener("beforeunload", () => { observer.disconnect(); stop(); });
+window.addEventListener("beforeunload", () => { observer.disconnect(); stopProcedure(); stopGirn(); });
