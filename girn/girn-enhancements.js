@@ -31,29 +31,31 @@ async function addWeeklyAudit(){
     const elapsed=Math.min(7,Math.max(1,Math.floor((new Date()-start)/86400000)+1));
     const compliant=[...days.values()].filter(shifts=>shifts.size>=2).length;
     panel.innerHTML=`<span class="section-kicker">MINGGU INI · ${from} hingga ${to}</span><h3>Ringkasan audit mingguan</h3><div class="amo-weekly-grid"><div><small>Pemeriksaan</small><strong>${inspections.length}</strong></div><div><small>Hari patuh</small><strong>${compliant}/${elapsed}</strong></div><div><small>Pematuhan</small><strong>${(compliant/elapsed*100).toFixed(1)}%</strong></div><div><small>Penemuan</small><strong>${findings.length}</strong></div></div>`;
-  }catch(error){ panel.querySelector("p").textContent=error.message||"Data mingguan gagal dimuatkan."; }
+  }catch(error){ const p=panel.querySelector("p"); if(p) p.textContent=error.message||"Data mingguan gagal dimuatkan."; }
 }
 
 function showLatestFindingsOnly(){
   const pageHeading=[...document.querySelectorAll("h2")].find(node=>String(node.textContent||"").trim()==="Daftar Penemuan");
-  const introHeading=[...document.querySelectorAll("h3")].find(node=>String(node.textContent||"").trim()==="Susulan penemuan"||String(node.textContent||"").trim()==="Penemuan terbaru");
+  const introHeading=[...document.querySelectorAll("h3")].find(node=>["Susulan penemuan","Penemuan terbaru"].includes(String(node.textContent||"").trim()));
   if(!pageHeading&&!introHeading) return;
 
-  if(introHeading){
-    introHeading.textContent="Penemuan terbaru";
-    const description=introHeading.parentElement?.querySelector("p");
-    if(description) description.textContent="Hanya penemuan baharu yang belum diambil maklum dipaparkan di sini.";
-  }
+  if(introHeading&&introHeading.textContent.trim()!=="Penemuan terbaru") introHeading.textContent="Penemuan terbaru";
+  const description=introHeading?.parentElement?.querySelector("p");
+  const latestDescription="Hanya penemuan baharu yang belum diambil maklum dipaparkan di sini.";
+  if(description&&description.textContent.trim()!==latestDescription) description.textContent=latestDescription;
 
   const tabs=document.querySelector(".filter-tabs");
-  if(tabs&&!tabs.querySelector(".amo-latest-tab")){
-    tabs.replaceChildren();
-    const tab=document.createElement("button");
-    tab.type="button";
-    tab.className="active amo-latest-tab";
-    tab.textContent="Penemuan terbaru";
-    tab.setAttribute("aria-current","page");
-    tabs.appendChild(tab);
+  if(tabs){
+    const existing=tabs.querySelector(".amo-latest-tab");
+    const alreadyOnlyLatest=existing&&tabs.children.length===1;
+    if(!alreadyOnlyLatest){
+      const tab=document.createElement("button");
+      tab.type="button";
+      tab.className="active amo-latest-tab";
+      tab.textContent="Penemuan terbaru";
+      tab.setAttribute("aria-current","page");
+      tabs.replaceChildren(tab);
+    }
   }
 
   const list=document.querySelector(".finding-list");
@@ -63,26 +65,26 @@ function showLatestFindingsOnly(){
     const badge=String(card.querySelector(".badge")?.textContent||"").trim().toLocaleLowerCase("ms-MY");
     const text=String(card.textContent||"").toLocaleLowerCase("ms-MY");
     const isNew=badge==="baharu"&&!text.includes("diambil maklum oleh")&&!text.includes("rekod ditutup");
-    card.hidden=!isNew;
+    if(card.hidden===isNew) card.hidden=!isNew;
     if(isNew) visible+=1;
   });
 
-  let empty=list.querySelector(".amo-findings-empty");
-  if(!visible){
-    if(!empty){
-      empty=document.createElement("div");
-      empty.className="amo-findings-empty";
-      empty.innerHTML="<strong>Tiada penemuan terbaru</strong><span>Tiada penemuan baharu yang belum diambil maklum.</span>";
-      list.appendChild(empty);
-    }
-  }else empty?.remove();
+  const empty=list.querySelector(".amo-findings-empty");
+  if(!visible&&!empty){
+    const node=document.createElement("div");
+    node.className="amo-findings-empty";
+    node.innerHTML="<strong>Tiada penemuan terbaru</strong><span>Tiada penemuan baharu yang belum diambil maklum.</span>";
+    list.appendChild(node);
+  }else if(visible&&empty){
+    empty.remove();
+  }
 }
 
 function removeLocalSupervisorActions(){
   const actionWords=["ambil maklum","diambil maklum","tandakan selesai","sahkan","selesaikan penemuan"];
   document.querySelectorAll("button").forEach(button=>{
     const text=String(button.textContent||"").trim().toLocaleLowerCase("ms-MY");
-    if(actionWords.some(word=>text.includes(word))){ button.remove(); }
+    if(actionWords.some(word=>text.includes(word))) button.remove();
   });
   const findingsHeading=[...document.querySelectorAll("h2,h3")].find(node=>String(node.textContent||"").toLocaleLowerCase("ms-MY").includes("penemuan"));
   const host=findingsHeading?.parentElement;
@@ -94,11 +96,22 @@ function removeLocalSupervisorActions(){
   }
 }
 
-// Tindakan penyelia sengaja tidak lagi dibuat dalam app GIRN.
-// Paparan Penemuan hanya menunjukkan penemuan baharu yang belum diambil maklum.
-const observer=new MutationObserver(()=>{ void addWeeklyAudit(); showLatestFindingsOnly(); removeLocalSupervisorActions(); });
+function applyEnhancements(){
+  void addWeeklyAudit();
+  showLatestFindingsOnly();
+  removeLocalSupervisorActions();
+}
+
+let enhancementFrame=0;
+const observer=new MutationObserver(()=>{
+  if(enhancementFrame) return;
+  enhancementFrame=requestAnimationFrame(()=>{
+    enhancementFrame=0;
+    applyEnhancements();
+  });
+});
 observer.observe(document.body,{childList:true,subtree:true});
-void addWeeklyAudit(); showLatestFindingsOnly(); removeLocalSupervisorActions();
+applyEnhancements();
 
 let initialStreams=0;
 let reloadTimer=null;
@@ -115,7 +128,7 @@ function liveChanged(){
   },350);
 }
 const stops=[window.AMOSubscribe?.("girn",liveChanged,console.error),window.AMOSubscribe?.("girnFindings",liveChanged,console.error)].filter(Boolean);
-window.addEventListener("beforeunload",()=>{observer.disconnect();stops.forEach(stop=>stop());});
+window.addEventListener("beforeunload",()=>{observer.disconnect();if(enhancementFrame)cancelAnimationFrame(enhancementFrame);stops.forEach(stop=>stop());});
 
 function fastPrint(){
   document.documentElement.classList.add("print-preparing");
@@ -125,8 +138,6 @@ function fastPrint(){
   }));
 }
 
-// Pintasan cetak disediakan selepas paparan semasa sempat dicat, supaya dialog
-// sistem tidak tersekat oleh kemas kini React dan pengiraan audit pada klik sama.
 document.addEventListener("click",event=>{
   const button=event.target.closest?.("button");
   if(!button||!/cetak laporan/i.test(button.textContent||"")) return;
