@@ -452,17 +452,72 @@ function monthlyChecklistRows(module) {
   }, recordTime);
 }
 
+function findingModuleFor(module) {
+  return module.id === "phc" ? phcFindings : girnFindings;
+}
+
+function monthlyFindingsFor(module, meta) {
+  const findingModule = findingModuleFor(module);
+  return rowsFor(findingModule).filter(row => recordDate(row).startsWith(meta.value)).sort((a, b) => recordTime(a) - recordTime(b));
+}
+
+function findingStatusLabel(row) {
+  const status = String(row.state || row.status || "Baharu").trim() || "Baharu";
+  return status;
+}
+
+function findingSummary(module, row) {
+  if (module.id === "phc") {
+    const title = row.item || row.type || "Penemuan PHC";
+    const detail = [row.bagShift, row.note, row.qty != null && row.standard != null ? `Baki ${row.qty}/${row.standard}` : ""].filter(Boolean).join(" · ");
+    return { title, detail };
+  }
+  const title = row.device || "Penemuan GIRN";
+  const detail = [row.inspectionStatus, row.note, row.shift ? `Syif ${row.shift}` : "", row.reporter].filter(Boolean).join(" · ");
+  return { title, detail };
+}
+
+function findingsDetailSection(module, findings) {
+  if (!findings.length) return `<section class="report-section"><h2>Perincian penemuan bulanan</h2><p class="print-empty">Tiada penemuan direkodkan bagi bulan ini.</p></section>`;
+  const grouped = new Map();
+  findings.forEach(row => {
+    const date = recordDate(row) || "Tarikh tidak diketahui";
+    if (!grouped.has(date)) grouped.set(date, []);
+    grouped.get(date).push(row);
+  });
+  const blocks = [...grouped.entries()].map(([date, rows]) => {
+    const label = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" }) : date;
+    return `<div class="finding-report-day"><h3>${escapeHtml(label)} · ${number.format(rows.length)} penemuan</h3>${rows.map(row => {
+      const summary = findingSummary(module, row);
+      return `<div class="finding-report-item"><strong>${escapeHtml(summary.title)}</strong>${summary.detail ? `<span>${escapeHtml(summary.detail)}</span>` : ""}<small>Status: ${escapeHtml(findingStatusLabel(row))}</small></div>`;
+    }).join("")}</div>`;
+  }).join("");
+  return `<section class="report-section finding-report-section"><h2>Perincian penemuan bulanan</h2><p>Hanya tarikh yang mempunyai penemuan disenaraikan di bawah.</p>${blocks}</section>`;
+}
+
 function dailyChecklistReport(module, title, meta) {
   const rows = monthlyChecklistRows(module);
+  const findings = monthlyFindingsFor(module, meta);
+  const findingsByDate = new Map();
+  findings.forEach(row => {
+    const date = recordDate(row);
+    if (!date) return;
+    if (!findingsByDate.has(date)) findingsByDate.set(date, []);
+    findingsByDate.get(date).push(row);
+  });
+  const outstandingFindings = findings.filter(row => isOutstanding(findingModuleFor(module), row)).length;
+  const acknowledgedOrDone = findings.length - outstandingFindings;
   const { dayStates, reportDays, compliantDays, pendingVerificationDays, missingDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
   const daily = dayStates.map(day => {
     const dateLabel = new Date(`${day.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
     const checklistStatus = day.completed ? reportStatus("done", "✓", "Dibuat") : reportStatus("missing", "✕", "Tidak dibuat");
     const verificationStatus = day.status === "verified" ? reportStatus("done", "✓", "Disahkan") : day.status === "pending" ? reportStatus("pending", "◷", "Belum disahkan") : reportStatus("neutral", "−", "—");
-    return `<tr><td><strong>${escapeHtml(dateLabel)}</strong></td><td>${checklistStatus}</td><td>${verificationStatus}</td><td class="record-count">${number.format(day.recordCount)}</td></tr>`;
+    const findingCount = findingsByDate.get(day.date)?.length || 0;
+    const findingText = findingCount ? `<strong>${number.format(findingCount)} penemuan</strong>` : `<span>Tiada</span>`;
+    return `<tr><td><strong>${escapeHtml(dateLabel)}</strong></td><td>${checklistStatus}</td><td>${verificationStatus}</td><td class="record-count">${number.format(day.recordCount)}</td><td>${findingText}</td></tr>`;
   }).join("");
-  const emptyRow = `<tr><td colspan="4" class="print-empty">Tiada tarikh untuk dinilai bagi bulan ini.</td></tr>`;
-  return reportDocument(title, meta, `<section class="report-kpis daily-report-kpis">${kpi("Hari dinilai", number.format(reportDays.length), "Tarikh hingga hari ini", "info")}${kpi("Hari patuh", number.format(compliantDays), "Dibuat dan disahkan", "good")}${kpi("Belum disahkan", number.format(pendingVerificationDays), "Menunggu penyelia", "pending")}${kpi("Tidak dibuat", number.format(missingDays), "Tiada checklist", "missing")}${kpi("Pematuhan", `${rate.toFixed(1)}%`, `${number.format(compliantDays)}/${number.format(reportDays.length)} hari`, "info")}</section><section class="report-section daily-section"><h2>Status harian ${escapeHtml(module.label)}</h2><p>Ringkasan checklist dan pengesahan penyelia bagi setiap tarikh.</p><table class="daily-report-table"><thead><tr><th>Tarikh</th><th>Status Checklist</th><th>Status Pengesahan</th><th>Bilangan Rekod</th></tr></thead><tbody>${daily || emptyRow}</tbody></table><p class="daily-report-legend"><strong>Patuh</strong> = sekurang-kurangnya satu checklist dibuat dan semua rekod pada tarikh tersebut telah disahkan.</p></section>`);
+  const emptyRow = `<tr><td colspan="5" class="print-empty">Tiada tarikh untuk dinilai bagi bulan ini.</td></tr>`;
+  return reportDocument(title, meta, `<section class="report-kpis daily-report-kpis">${kpi("Hari dinilai", number.format(reportDays.length), "Tarikh hingga hari ini", "info")}${kpi("Hari patuh", number.format(compliantDays), "Dibuat dan disahkan", "good")}${kpi("Belum disahkan", number.format(pendingVerificationDays), "Menunggu penyelia", "pending")}${kpi("Tidak dibuat", number.format(missingDays), "Tiada checklist", "missing")}${kpi("Pematuhan", `${rate.toFixed(1)}%`, `${number.format(compliantDays)}/${number.format(reportDays.length)} hari`, "info")}${kpi("Jumlah penemuan", number.format(findings.length), "Dalam bulan dipilih", "info")}${kpi("Belum diambil maklum", number.format(outstandingFindings), "Masih perlukan tindakan", "pending")}${kpi("Diambil maklum / selesai", number.format(acknowledgedOrDone), "Telah diproses", "good")}</section><section class="report-section daily-section"><h2>Status harian ${escapeHtml(module.label)}</h2><p>Ringkasan checklist, pengesahan penyelia dan jumlah penemuan bagi setiap tarikh.</p><table class="daily-report-table"><thead><tr><th>Tarikh</th><th>Status Checklist</th><th>Status Pengesahan</th><th>Bilangan Rekod</th><th>Penemuan</th></tr></thead><tbody>${daily || emptyRow}</tbody></table><p class="daily-report-legend"><strong>Patuh</strong> = sekurang-kurangnya satu checklist dibuat dan semua rekod pada tarikh tersebut telah disahkan.</p></section>${findingsDetailSection(module, findings)}`);
 }
 
 function phcReport(meta) {
