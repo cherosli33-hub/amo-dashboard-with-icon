@@ -1,4 +1,4 @@
-import { SHIFTS, formatDate, getWeekDays, isoDate, loadFindings, loadLatestInventory, loadPendingSync, loadRecords, loadRestockActions, reconcileRemoteRecords, recordLowItems, saveFindings, saveLatestInventory, savePendingSync, saveRestockAction } from "./app.js";
+import { SHIFTS, formatDate, getWeekDays, isoDate, loadFindings, loadLatestInventory, loadPendingSync, loadRecords, loadRestockActions, operationalDate, operationalDateKey, reconcileRemoteRecords, recordLowItems, saveFindings, saveLatestInventory, savePendingSync, saveRestockAction } from "./app.js";
 import { apiConfigured, fetchDashboard, syncPendingInspections, syncPendingRestockActions } from "./api.js";
 
 const content=document.querySelector("#dashboardContent");
@@ -9,7 +9,7 @@ let records=loadRecords(); let findings=loadFindings(); let connectionMessage=""
 
 function refreshDateWindow(){
   const previous=today;
-  now=new Date(); today=isoDate(now); weekDays=getWeekDays(now);
+  now=new Date(); today=operationalDateKey(now); weekDays=getWeekDays(operationalDate(now));
   return Boolean(previous&&previous!==today);
 }
 refreshDateWindow();

@@ -1,8 +1,8 @@
-import { formatDate, getWeekDays, isoDate, loadRecords, reconcileRemoteRecords, recordLowItems } from "./app.js";
+import { formatDate, getWeekDays, isoDate, loadRecords, operationalDate, operationalDateKey, reconcileRemoteRecords, recordLowItems } from "./app.js";
 import { apiConfigured, fetchRecords } from "./api.js";
 
 const root=document.querySelector("#recordsContent"); const modal=document.querySelector("#recordModal");
-const days=getWeekDays(); const today=isoDate(new Date()); let records=loadRecords(); let loading=false; let notice="";
+const days=getWeekDays(operationalDate()); const today=operationalDateKey(); let records=loadRecords(); let loading=false; let notice="";
 let selected=days.some(day=>isoDate(day)===today)?today:isoDate(days[0]);
 const dayNames=["Isnin","Selasa","Rabu","Khamis","Jumaat","Sabtu","Ahad"];
 function esc(value=""){ return String(value).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c])); }

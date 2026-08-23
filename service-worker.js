@@ -1,4 +1,4 @@
-const CACHE = "amo-dashboard-v2-firebase-6";
+const CACHE = "amo-dashboard-v2-firebase-7";
 const ASSETS = [
   "./",
   "./index.html",

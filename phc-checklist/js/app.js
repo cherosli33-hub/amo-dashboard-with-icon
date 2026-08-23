@@ -24,7 +24,12 @@ export const CATEGORIES = [
   ]}
 ];
 
-export const SHIFTS = ["Pagi","Petang","Malam"];
+export const SHIFT_SCHEDULE = [
+  { label:"Pagi", start:7*60, end:14*60, time:"07:00–14:00" },
+  { label:"Petang", start:14*60, end:21*60, time:"14:00–21:00" },
+  { label:"Malam", start:21*60, end:7*60, time:"21:00–07:00" }
+];
+export const SHIFTS = SHIFT_SCHEDULE.map(shift=>shift.label);
 export const STORAGE_KEY = "phcProductionRecords";
 export const LATEST_INVENTORY_KEY = "phcProductionLatestInventory";
 export const PENDING_SYNC_KEY = "phcPendingSync";
@@ -32,6 +37,22 @@ export const RESTOCK_ACTIONS_KEY = "phcRestockActions";
 export const FINDINGS_KEY = "phcFindings";
 
 export function categoriesForBag(bag){ return CATEGORIES.filter(category => bag === "PHC 1" || !category.phc1Only); }
+export function shiftForDate(input=new Date()){
+  const date=new Date(input); const minutes=date.getHours()*60+date.getMinutes();
+  return minutes>=7*60&&minutes<14*60?"Pagi":minutes>=14*60&&minutes<21*60?"Petang":"Malam";
+}
+export function shiftTime(label){ return SHIFT_SCHEDULE.find(shift=>shift.label===label)?.time||""; }
+export function operationalDate(input=new Date()){
+  const date=new Date(input);
+  if(date.getHours()<7) date.setDate(date.getDate()-1);
+  return date;
+}
+export function operationalDateKey(input=new Date()){ return isoDate(operationalDate(input)); }
+export function dateKeyForShift(input=new Date(),shift=shiftForDate(input)){
+  const date=new Date(input);
+  if(shift==="Malam"&&date.getHours()<7) date.setDate(date.getDate()-1);
+  return isoDate(date);
+}
 export function startOfWeek(input=new Date()){ const d=new Date(input); const day=d.getDay() || 7; d.setHours(0,0,0,0); d.setDate(d.getDate()-day+1); return d; }
 export function isoDate(date){ const y=date.getFullYear(); const m=String(date.getMonth()+1).padStart(2,"0"); const d=String(date.getDate()).padStart(2,"0"); return `${y}-${m}-${d}`; }
 export function formatDate(date, options={weekday:"long",day:"numeric",month:"long",year:"numeric"}){ return new Intl.DateTimeFormat("ms-MY",options).format(date); }
@@ -58,7 +79,7 @@ export function loadFindings(){ try { return JSON.parse(localStorage.getItem(FIN
 export function saveFindings(findings){ localStorage.setItem(FINDINGS_KEY,JSON.stringify(Array.isArray(findings)?findings:[])); }
 export function loadPendingSync(){ try { return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY)) || []; } catch { return []; } }
 export function savePendingSync(records){ localStorage.setItem(PENDING_SYNC_KEY,JSON.stringify(records)); }
-export function getWeekDays(){ const monday=startOfWeek(); return Array.from({length:7},(_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return d; }); }
+export function getWeekDays(input=new Date()){ const monday=startOfWeek(input); return Array.from({length:7},(_,i)=>{ const d=new Date(monday); d.setDate(monday.getDate()+i); return d; }); }
 export function recordLowItems(record){ if(!record?.quantities) return []; return Object.values(record.quantities).flatMap(category => category.items || []).filter(item => item.qty < item.standard); }
 
 export function registerServiceWorker(){

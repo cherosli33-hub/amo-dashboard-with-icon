@@ -64,6 +64,11 @@ function localDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone:"Asia/Kuala_Lumpur", year:"numeric", month:"2-digit", day:"2-digit" }).format(date);
 }
 
+function operationalDateKey(date = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", hourCycle:"h23" }).format(date));
+  return localDateKey(hour < 7 ? new Date(date.getTime() - 24 * 60 * 60 * 1000) : date);
+}
+
 function dateObject(value) {
   if (!value) return null;
   if (typeof value?.toDate === "function") return value.toDate();
@@ -112,7 +117,7 @@ function valueOf(row, key) {
 }
 
 function rowsFor(module) { return state.data.get(module.id) || []; }
-function todayRows(module) { const today = localDateKey(); return rowsFor(module).filter(row => recordDate(row) === today); }
+function todayRows(module) { const today = module.id === "phc" ? operationalDateKey() : localDateKey(); return rowsFor(module).filter(row => recordDate(row) === today); }
 function normalizedStatus(row) { return String(row.actionStatus || row.state || row.status || "").trim().toLocaleLowerCase("ms-MY"); }
 function normalizedType(row) { return String(row.type || "").trim().toLocaleLowerCase("ms-MY"); }
 
@@ -130,7 +135,7 @@ function shiftId(value) {
 function issueCounts() {
   const severeAsthma = todayRows(asthma).filter(row => /severe|red/i.test(`${row.categoryBefore} ${row.categoryAfter} ${row.uptriage}`));
   const incompleteAsthma = todayRows(asthma).filter(row => row.pefrNotDone || row.incomplete);
-  const phcNotes = rowsFor(phcFindings).filter(row => recordDate(row) === localDateKey() && isOutstanding(phcFindings, row));
+  const phcNotes = rowsFor(phcFindings).filter(row => recordDate(row) === operationalDateKey() && isOutstanding(phcFindings, row));
   const girnIssues = rowsFor(girnFindings).filter(row => recordDate(row) === localDateKey() && isOutstanding(girnFindings, row));
   const general = rowsFor(actionTaskModule).filter(row => recordDate(row) === localDateKey() && isOutstanding(actionTaskModule, row));
   return { severeAsthma, incompleteAsthma, phcNotes, girnIssues, general };
@@ -139,7 +144,7 @@ function issueCounts() {
 function renderHero() {
   const now = new Date();
   const currentHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", hourCycle:"h23" }).format(now));
-  const activeShift = currentHour >= 22 || currentHour < 7 ? "Malam" : currentHour < 15 ? "Pagi" : "Petang";
+  const activeShift = currentHour >= 21 || currentHour < 7 ? "Malam" : currentHour < 14 ? "Pagi" : "Petang";
   document.querySelector("#todayContext").textContent = `${now.toLocaleDateString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", weekday:"long", day:"numeric", month:"long", year:"numeric" })} · Syif ${activeShift} · ${roleLabel()}`;
   const issues = issueCounts();
   const total = Object.values(issues).reduce((sum, list) => sum + list.length, 0);
