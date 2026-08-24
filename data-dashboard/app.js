@@ -117,7 +117,25 @@ function valueOf(row, key) {
 }
 
 function rowsFor(module) { return state.data.get(module.id) || []; }
-function todayRows(module) { const today = module.id === "phc" ? operationalDateKey() : localDateKey(); return rowsFor(module).filter(row => recordDate(row) === today); }
+function operationalRecordDate(row) {
+  const stored = /^\d{4}-\d{2}-\d{2}/.test(String(row.date || "")) ? String(row.date).slice(0, 10) : "";
+  const value = row.submittedAt || row.timestamp || row.savedAt || row.createdAt || row.reportedAt;
+  const parsed = dateObject(value);
+  if (!parsed) return stored;
+  if (shiftId(row.shift) === "night") {
+    const calendarDate = localDateKey(parsed);
+    const shiftDate = operationalDateKey(parsed);
+    if (!stored || stored === calendarDate) return shiftDate;
+  }
+  return stored || localDateKey(parsed);
+}
+function moduleRecordDate(module, row) {
+  return module.id === "phc" || module.id === "girn" ? operationalRecordDate(row) : recordDate(row);
+}
+function todayRows(module) {
+  const today = module.id === "phc" || module.id === "girn" ? operationalDateKey() : localDateKey();
+  return rowsFor(module).filter(row => moduleRecordDate(module, row) === today);
+}
 function normalizedStatus(row) { return String(row.actionStatus || row.state || row.status || "").trim().toLocaleLowerCase("ms-MY"); }
 function normalizedType(row) { return String(row.type || "").trim().toLocaleLowerCase("ms-MY"); }
 
@@ -136,7 +154,7 @@ function issueCounts() {
   const severeAsthma = todayRows(asthma).filter(row => /severe|red/i.test(`${row.categoryBefore} ${row.categoryAfter} ${row.uptriage}`));
   const incompleteAsthma = todayRows(asthma).filter(row => row.pefrNotDone || row.incomplete);
   const phcNotes = rowsFor(phcFindings).filter(row => recordDate(row) === operationalDateKey() && isOutstanding(phcFindings, row));
-  const girnIssues = rowsFor(girnFindings).filter(row => recordDate(row) === localDateKey() && isOutstanding(girnFindings, row));
+  const girnIssues = rowsFor(girnFindings).filter(row => operationalRecordDate(row) === operationalDateKey() && isOutstanding(girnFindings, row));
   const general = rowsFor(actionTaskModule).filter(row => recordDate(row) === localDateKey() && isOutstanding(actionTaskModule, row));
   return { severeAsthma, incompleteAsthma, phcNotes, girnIssues, general };
 }
@@ -207,8 +225,8 @@ function recentText(module, row) {
 }
 
 function renderRecent() {
-  const today = localDateKey();
-  const items = primaryModules.flatMap(module => rowsFor(module).filter(row => recordDate(row) === today).map(row => ({ module, row, time:recordTime(row) }))).sort((a, b) => b.time - a.time).slice(0, 8);
+  const today = operationalDateKey();
+  const items = primaryModules.flatMap(module => rowsFor(module).filter(row => moduleRecordDate(module, row) === (module.id === "procedure" || module.id === "asthma" ? localDateKey() : today)).map(row => ({ module, row, time:recordTime(row) }))).sort((a, b) => b.time - a.time).slice(0, 8);
   document.querySelector("#recentList").innerHTML = items.length ? items.map(({ module, row }) => {
     const [title, detail] = recentText(module, row);
     const time = dateObject(row.submittedAt || row.timestamp || row.savedAt || `${row.date}T${row.time || "00:00"}:00+08:00`)?.toLocaleTimeString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", minute:"2-digit" }) || "—";
@@ -240,7 +258,7 @@ function actionBadgeFor(module, row) {
 }
 
 function dailyVerificationStates(module) {
-  return buildDailyVerificationStates(rowsFor(module), rowsFor(supervisorAudit), `${module.id}-daily`, recordDate);
+  return buildDailyVerificationStates(rowsFor(module), rowsFor(supervisorAudit), `${module.id}-daily`, row => moduleRecordDate(module, row));
 }
 
 function dailyVerificationItems() {
@@ -395,7 +413,7 @@ function selectedMonthMeta() {
 
 function monthlyRows(module) {
   const prefix = selectedMonthMeta().value;
-  return rowsFor(module).filter(row => recordDate(row).startsWith(prefix));
+  return rowsFor(module).filter(row => moduleRecordDate(module, row).startsWith(prefix));
 }
 
 function kpi(label, value, note = "", tone = "") {
@@ -458,8 +476,7 @@ function reportStatus(tone, symbol, label) {
 function monthlyChecklistRows(module) {
   const rows = monthlyRows(module);
   return latestRowsBySlot(rows, row => {
-    const date = recordDate(row);
-    if (module.id === "phc") return `${date}|${String(row.bag || "beg-tidak-diketahui").trim().toLocaleUpperCase("ms-MY")}`;
+    const date = moduleRecordDate(module, row);
     const shift = shiftId(row.shift) || String(row.shift || "tidak-diketahui").trim().toLocaleLowerCase("ms-MY");
     return `${date}|${shift}`;
   }, recordTime);
@@ -520,7 +537,7 @@ function dailyChecklistReport(module, title, meta) {
   });
   const outstandingFindings = findings.filter(row => isOutstanding(findingModuleFor(module), row)).length;
   const acknowledgedOrDone = findings.length - outstandingFindings;
-  const { dayStates, reportDays, compliantDays, pendingVerificationDays, missingDays, rate } = buildDailyComplianceSummary(rows, meta, localDateKey(), recordDate);
+  const { dayStates, reportDays, compliantDays, pendingVerificationDays, missingDays, rate } = buildDailyComplianceSummary(rows, meta, operationalDateKey(), row => moduleRecordDate(module, row));
   const daily = dayStates.map(day => {
     const dateLabel = new Date(`${day.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"long", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
     const checklistStatus = day.completed ? reportStatus("done", "✓", "Dibuat") : reportStatus("missing", "✕", "Tidak dibuat");
