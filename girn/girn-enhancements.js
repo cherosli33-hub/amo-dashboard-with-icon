@@ -1,5 +1,5 @@
 const style=document.createElement("style");
-style.textContent=`.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}.amo-central-action-note{margin:10px 0;padding:10px 12px;border-radius:9px;background:#eef7f4;color:#185f55;font-size:12px;font-weight:700}.amo-findings-empty{padding:28px 18px;text-align:center;border:1px dashed #c9ddd7;border-radius:14px;background:#f8fbfa;color:#527068}.amo-findings-empty strong{display:block;margin-bottom:5px;color:#174f46}.filter-tabs .amo-latest-tab{pointer-events:none}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}}`;
+style.textContent=`.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}.amo-central-action-note{margin:10px 0;padding:10px 12px;border-radius:9px;background:#eef7f4;color:#185f55;font-size:12px;font-weight:700}.amo-findings-empty{padding:28px 18px;text-align:center;border:1px dashed #c9ddd7;border-radius:14px;background:#f8fbfa;color:#527068}.amo-findings-empty strong{display:block;margin-bottom:5px;color:#174f46}.filter-tabs .amo-latest-tab{pointer-events:none}.amo-shift-lock-note{margin:0 0 14px;padding:11px 13px;border-radius:10px;background:#fff7df;border:1px solid #ecd28c;color:#75520a;font-size:13px;font-weight:700}.checklist-form .amo-locked-field{cursor:not-allowed;background:#f1f4f3;color:#66736f}.shift-status-card button:disabled{cursor:not-allowed;opacity:.62;background:#e8eeec;color:#60706b;box-shadow:none}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}}`;
 document.head.appendChild(style);
 if(!document.body) await new Promise(resolve=>document.addEventListener("DOMContentLoaded",resolve,{once:true}));
 
@@ -96,10 +96,78 @@ function removeLocalSupervisorActions(){
   }
 }
 
+function malaysiaInspectionContext(){
+  const now=new Date();
+  const hour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kuala_Lumpur",hour:"2-digit",hourCycle:"h23"}).format(now));
+  const operationalDate=new Date(now);
+  if(hour<7) operationalDate.setTime(operationalDate.getTime()-864e5);
+  const parts=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kuala_Lumpur",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(operationalDate).map(part=>[part.type,part.value]));
+  return {
+    date:`${parts.year}-${parts.month}-${parts.day}`,
+    shift:hour>=21||hour<7?"Malam":hour<14?"Pagi":"Petang"
+  };
+}
+
+function lockChecklistToCurrentShift(){
+  const context=malaysiaInspectionContext();
+  const form=document.querySelector(".checklist-form");
+  if(form){
+    const dateInput=form.querySelector('input[type="date"]');
+    const shiftSelect=form.querySelector("select");
+    if(dateInput){
+      if(dateInput.value!==context.date) dateInput.value=context.date;
+      dateInput.disabled=true;
+      dateInput.classList.add("amo-locked-field");
+      dateInput.title="Tarikh ditetapkan secara automatik mengikut waktu Malaysia.";
+    }
+    if(shiftSelect){
+      if(shiftSelect.value!==context.shift){
+        const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value")?.set;
+        setter?.call(shiftSelect,context.shift);
+        shiftSelect.dispatchEvent(new Event("change",{bubbles:true}));
+      }
+      shiftSelect.disabled=true;
+      shiftSelect.classList.add("amo-locked-field");
+      shiftSelect.title="Hanya syif semasa boleh diperiksa.";
+    }
+    if(!form.querySelector(".amo-shift-lock-note")){
+      const note=document.createElement("p");
+      note.className="amo-shift-lock-note";
+      note.textContent=`Pemeriksaan hanya dibenarkan untuk Syif ${context.shift} semasa. Syif yang telah tamat tidak boleh diisi semula.`;
+      form.prepend(note);
+    }
+  }
+
+  const shifts=["Pagi","Petang","Malam"];
+  const currentIndex=shifts.indexOf(context.shift);
+  document.querySelectorAll(".shift-status-card").forEach(card=>{
+    const title=String(card.querySelector("strong")?.textContent||"");
+    const shift=shifts.find(item=>title.includes(item));
+    const button=card.querySelector("button");
+    const badge=String(card.querySelector(".badge")?.textContent||"").trim();
+    if(!shift||!button||badge==="Selesai") return;
+    const index=shifts.indexOf(shift);
+    const allowed=index===currentIndex;
+    button.disabled=!allowed;
+    if(index<currentIndex){
+      button.textContent="Masa pemeriksaan tamat";
+      const small=card.querySelector("small");
+      if(small) small.textContent="Syif terlepas · tidak boleh diisi semula";
+    }else if(index>currentIndex){
+      button.textContent="Belum bermula";
+      const small=card.querySelector("small");
+      if(small) small.textContent="Menunggu waktu syif";
+    }else{
+      button.textContent="Periksa sekarang →";
+    }
+  });
+}
+
 function applyEnhancements(){
   void addWeeklyAudit();
   showLatestFindingsOnly();
   removeLocalSupervisorActions();
+  lockChecklistToCurrentShift();
 }
 
 let enhancementFrame=0;
