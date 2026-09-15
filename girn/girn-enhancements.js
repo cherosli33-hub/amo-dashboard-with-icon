@@ -110,55 +110,77 @@ function malaysiaInspectionContext(){
 
 function lockChecklistToCurrentShift(){
   const context=malaysiaInspectionContext();
+  const shifts=["Pagi","Petang","Malam"];
+  const currentIndex=shifts.indexOf(context.shift);
   const form=document.querySelector(".checklist-form");
+
   if(form){
     const dateInput=form.querySelector('input[type="date"]');
     const shiftSelect=form.querySelector("select");
+
     if(dateInput){
       if(dateInput.value!==context.date) dateInput.value=context.date;
       dateInput.disabled=true;
       dateInput.classList.add("amo-locked-field");
-      dateInput.title="Tarikh ditetapkan secara automatik mengikut waktu Malaysia.";
+      dateInput.title="Tarikh ditetapkan secara automatik mengikut hari operasi.";
     }
+
     if(shiftSelect){
-      if(shiftSelect.value!==context.shift){
-        const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value")?.set;
-        setter?.call(shiftSelect,context.shift);
-        shiftSelect.dispatchEvent(new Event("change",{bubbles:true}));
-      }
-      shiftSelect.disabled=true;
-      shiftSelect.classList.add("amo-locked-field");
-      shiftSelect.title="Hanya syif semasa boleh diperiksa.";
+      shiftSelect.disabled=false;
+      shiftSelect.classList.remove("amo-locked-field");
+      shiftSelect.title="Syif semasa atau syif terdahulu yang tertinggal boleh dipilih.";
+      [...shiftSelect.options].forEach(option=>{
+        option.disabled=shifts.indexOf(option.value)>currentIndex;
+      });
     }
-    if(!form.querySelector(".amo-shift-lock-note")){
-      const note=document.createElement("p");
+
+    let note=form.querySelector(".amo-shift-lock-note");
+    if(!note){
+      note=document.createElement("p");
       note.className="amo-shift-lock-note";
-      note.textContent=`Pemeriksaan hanya dibenarkan untuk Syif ${context.shift} semasa. Syif yang telah tamat tidak boleh diisi semula.`;
       form.prepend(note);
+    }
+    const allowed=shifts.slice(0,currentIndex+1).join(", ");
+    const message=`Boleh buat pemeriksaan Syif ${allowed}. Syif yang belum bermula masih dikunci.`;
+    if(note.textContent!==message) note.textContent=message;
+
+    if(!form.dataset.amoShiftGuard){
+      form.dataset.amoShiftGuard="true";
+      form.addEventListener("submit",event=>{
+        const selected=form.querySelector("select")?.value;
+        const live=malaysiaInspectionContext();
+        if(shifts.indexOf(selected)>shifts.indexOf(live.shift)){
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          alert("Syif ini belum bermula dan belum boleh diperiksa.");
+        }
+      },true);
     }
   }
 
-  const shifts=["Pagi","Petang","Malam"];
-  const currentIndex=shifts.indexOf(context.shift);
   document.querySelectorAll(".shift-status-card").forEach(card=>{
     const title=String(card.querySelector("strong")?.textContent||"");
     const shift=shifts.find(item=>title.includes(item));
     const button=card.querySelector("button");
     const badge=String(card.querySelector(".badge")?.textContent||"").trim();
     if(!shift||!button||badge==="Selesai") return;
+
     const index=shifts.indexOf(shift);
-    const allowed=index===currentIndex;
-    button.disabled=!allowed;
-    if(index<currentIndex){
-      if(button.textContent!=="Masa pemeriksaan tamat") button.textContent="Masa pemeriksaan tamat";
-      const small=card.querySelector("small");
-      if(small&&small.textContent!=="Syif terlepas · tidak boleh diisi semula") small.textContent="Syif terlepas · tidak boleh diisi semula";
-    }else if(index>currentIndex){
+    const isFuture=index>currentIndex;
+    button.disabled=isFuture;
+
+    if(isFuture){
       if(button.textContent!=="Belum bermula") button.textContent="Belum bermula";
       const small=card.querySelector("small");
       if(small&&small.textContent!=="Menunggu waktu syif") small.textContent="Menunggu waktu syif";
+    }else if(index<currentIndex){
+      if(button.textContent!=="Lengkapkan sekarang →") button.textContent="Lengkapkan sekarang →";
+      const small=card.querySelector("small");
+      if(small&&small.textContent!=="Pemeriksaan tertinggal") small.textContent="Pemeriksaan tertinggal";
     }else{
       if(button.textContent!=="Periksa sekarang →") button.textContent="Periksa sekarang →";
+      const small=card.querySelector("small");
+      if(small&&small.textContent!=="Menunggu pemeriksaan") small.textContent="Menunggu pemeriksaan";
     }
   });
 }
