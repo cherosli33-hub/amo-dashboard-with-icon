@@ -150,15 +150,15 @@ function lockChecklistToCurrentShift(){
     const allowed=index===currentIndex;
     button.disabled=!allowed;
     if(index<currentIndex){
-      button.textContent="Masa pemeriksaan tamat";
+      if(button.textContent!=="Masa pemeriksaan tamat") button.textContent="Masa pemeriksaan tamat";
       const small=card.querySelector("small");
-      if(small) small.textContent="Syif terlepas · tidak boleh diisi semula";
+      if(small&&small.textContent!=="Syif terlepas · tidak boleh diisi semula") small.textContent="Syif terlepas · tidak boleh diisi semula";
     }else if(index>currentIndex){
-      button.textContent="Belum bermula";
+      if(button.textContent!=="Belum bermula") button.textContent="Belum bermula";
       const small=card.querySelector("small");
-      if(small) small.textContent="Menunggu waktu syif";
+      if(small&&small.textContent!=="Menunggu waktu syif") small.textContent="Menunggu waktu syif";
     }else{
-      button.textContent="Periksa sekarang →";
+      if(button.textContent!=="Periksa sekarang →") button.textContent="Periksa sekarang →";
     }
   });
 }
