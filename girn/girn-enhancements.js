@@ -1,5 +1,5 @@
 const style=document.createElement("style");
-style.textContent=`.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}.amo-central-action-note{margin:10px 0;padding:10px 12px;border-radius:9px;background:#eef7f4;color:#185f55;font-size:12px;font-weight:700}.amo-findings-empty{padding:28px 18px;text-align:center;border:1px dashed #c9ddd7;border-radius:14px;background:#f8fbfa;color:#527068}.amo-findings-empty strong{display:block;margin-bottom:5px;color:#174f46}.filter-tabs .amo-latest-tab{pointer-events:none}.amo-shift-lock-note{margin:0 0 14px;padding:11px 13px;border-radius:10px;background:#fff7df;border:1px solid #ecd28c;color:#75520a;font-size:13px;font-weight:700}.checklist-form .amo-locked-field{cursor:not-allowed;background:#f1f4f3;color:#66736f}.shift-status-card button:disabled{cursor:not-allowed;opacity:.62;background:#e8eeec;color:#60706b;box-shadow:none}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}}`;
+style.textContent=`.amo-weekly{margin-bottom:16px}.amo-weekly-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.amo-weekly-grid div{padding:12px;border-radius:10px;background:#f3f8f6}.amo-weekly-grid strong,.amo-weekly-grid small{display:block}.amo-weekly-grid strong{margin-top:4px;font-size:22px;color:#116e5e}.amo-live-note{position:fixed;right:18px;bottom:18px;z-index:9999;padding:11px 14px;border-radius:10px;background:#073f39;color:#fff;box-shadow:0 8px 25px #0002;font-size:13px}.amo-central-action-note{margin:10px 0;padding:10px 12px;border-radius:9px;background:#eef7f4;color:#185f55;font-size:12px;font-weight:700}.amo-findings-empty{padding:28px 18px;text-align:center;border:1px dashed #c9ddd7;border-radius:14px;background:#f8fbfa;color:#527068}.amo-findings-empty strong{display:block;margin-bottom:5px;color:#174f46}.filter-tabs .amo-latest-tab{pointer-events:none}.checklist-form .amo-locked-field{cursor:not-allowed;background:#f1f4f3;color:#66736f}.shift-status-card button:disabled{cursor:not-allowed;opacity:.62;background:#e8eeec;color:#60706b;box-shadow:none}@media(max-width:650px){.amo-weekly-grid{grid-template-columns:1fr 1fr}}`;
 document.head.appendChild(style);
 if(!document.body) await new Promise(resolve=>document.addEventListener("DOMContentLoaded",resolve,{once:true}));
 
@@ -133,16 +133,6 @@ function lockChecklistToCurrentShift(){
         option.disabled=shifts.indexOf(option.value)>currentIndex;
       });
     }
-
-    let note=form.querySelector(".amo-shift-lock-note");
-    if(!note){
-      note=document.createElement("p");
-      note.className="amo-shift-lock-note";
-      form.prepend(note);
-    }
-    const allowed=shifts.slice(0,currentIndex+1).join(", ");
-    const message=`Boleh buat pemeriksaan Syif ${allowed}. Syif yang belum bermula masih dikunci.`;
-    if(note.textContent!==message) note.textContent=message;
 
     if(!form.dataset.amoShiftGuard){
       form.dataset.amoShiftGuard="true";
