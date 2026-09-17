@@ -437,15 +437,70 @@ function procedureNames(row) {
   return values.map(item => typeof item === "object" && item ? item.name || item.procedure || item.label || item.type : item).map(item => String(item || "").trim()).filter(Boolean);
 }
 
+const PROCEDURE_REPORT_ZONES = [
+  { id:"secondary_triage", label:"Secondary Triage", color:"#00acc1" },
+  { id:"yellow_zone", label:"Yellow Zone", color:"#f2a93b" },
+  { id:"red_zone", label:"Red Zone", color:"#e2622e" }
+];
+
+function procedureZoneId(value) {
+  const key = String(value || "").trim().toLocaleLowerCase("ms-MY").replace(/[\s-]+/g, "_");
+  return {
+    secondary:"secondary_triage",
+    secondary_triage:"secondary_triage",
+    yellow:"yellow_zone",
+    yellow_zone:"yellow_zone",
+    red:"red_zone",
+    red_zone:"red_zone"
+  }[key] || key || "unassigned";
+}
+
+function procedurePatientKey(row) {
+  const id = String(row.registrationNumber || row.patientId || row.id || "").trim().toLocaleUpperCase("ms-MY");
+  const shift = String(row.shift || "").trim().toLocaleLowerCase("ms-MY");
+  return id ? `${id}|${shift}` : "";
+}
+
 function procedureReport(meta) {
   const rows = monthlyRows(procedure);
   const totals = new Map();
-  rows.forEach(row => procedureNames(row).forEach(name => totals.set(name, (totals.get(name) || 0) + 1)));
+  const zoneGroups = new Map(PROCEDURE_REPORT_ZONES.map(zone => [zone.id, {
+    ...zone,
+    procedureTotal:0,
+    patients:new Set(),
+    procedures:new Map()
+  }]));
+  rows.forEach(row => {
+    const zoneId = procedureZoneId(row.zone);
+    if (!zoneGroups.has(zoneId)) zoneGroups.set(zoneId, {
+      id:zoneId,
+      label:"Tiada Zone",
+      color:"#8a8478",
+      procedureTotal:0,
+      patients:new Set(),
+      procedures:new Map()
+    });
+    const zone = zoneGroups.get(zoneId);
+    const patientKey = procedurePatientKey(row);
+    if (patientKey) zone.patients.add(patientKey);
+    procedureNames(row).forEach(name => {
+      totals.set(name, (totals.get(name) || 0) + 1);
+      if (!zone.procedures.has(name)) zone.procedures.set(name, { count:0, patients:new Set() });
+      const procedureEntry = zone.procedures.get(name);
+      procedureEntry.count += 1;
+      if (patientKey) procedureEntry.patients.add(patientKey);
+      zone.procedureTotal += 1;
+    });
+  });
   const totalProcedures = [...totals.values()].reduce((sum, value) => sum + value, 0);
-  const patients = new Set(rows.map(row => String(row.registrationNumber || row.patientId || row.id || "").trim()).filter(Boolean));
-  const bodyRows = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ms-MY"));
-  const detail = `<section class="report-section"><h2>Ringkasan prosedur</h2><table><thead><tr><th>Prosedur</th><th>Jumlah</th><th>Peratus</th></tr></thead><tbody>${bodyRows.length ? bodyRows.map(([name, count]) => `<tr><td>${escapeHtml(name)}</td><td>${number.format(count)}</td><td>${totalProcedures ? ((count / totalProcedures) * 100).toFixed(1) : "0.0"}%</td></tr>`).join("") : `<tr><td colspan="3" class="print-empty">Tiada prosedur direkodkan bagi bulan ini.</td></tr>`}</tbody><tfoot><tr><th>Jumlah keseluruhan</th><th>${number.format(totalProcedures)}</th><th>100%</th></tr></tfoot></table></section>`;
-  return reportDocument("Laporan Bulanan Prosedur", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size || rows.length))}${kpi("Jumlah prosedur", number.format(totalProcedures))}${kpi("Jenis prosedur", number.format(totals.size))}</section>${reportFolder("Perincian prosedur bulanan", bodyRows.length, detail)}`);
+  const patients = new Set(rows.map(procedurePatientKey).filter(Boolean));
+  const zoneSections = [...zoneGroups.values()].map(zone => {
+    const procedureRows = [...zone.procedures.entries()].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0], "ms-MY"));
+    const tableRows = procedureRows.map(([name, entry]) => `<tr><td>${escapeHtml(name)}</td><td>${number.format(entry.count)}</td><td>${number.format(entry.patients.size)}</td><td>${zone.procedureTotal ? ((entry.count / zone.procedureTotal) * 100).toFixed(1) : "0.0"}%</td></tr>`).join("");
+    return `<section class="procedure-zone-report" style="--zone-color:${escapeHtml(zone.color)}"><header><div><i aria-hidden="true"></i><h3>${escapeHtml(zone.label)}</h3></div><p><strong>${number.format(zone.procedureTotal)}</strong> prosedur · ${number.format(zone.patients.size)} pesakit</p></header>${tableRows ? `<table><thead><tr><th>Prosedur</th><th>Jumlah</th><th>Pesakit</th><th>% dalam zon</th></tr></thead><tbody>${tableRows}</tbody><tfoot><tr><th>Jumlah ${escapeHtml(zone.label)}</th><th>${number.format(zone.procedureTotal)}</th><th>${number.format(zone.patients.size)}</th><th>100%</th></tr></tfoot></table>` : `<p class="procedure-zone-empty">Tiada prosedur direkodkan dalam zon ini.</p>`}</section>`;
+  }).join("");
+  const detail = `<section class="report-section procedure-zone-breakdown"><h2>Ringkasan prosedur mengikut zon</h2><p>Jumlah prosedur bagi setiap zon dan pecahan jenis prosedur yang direkodkan.</p>${totalProcedures ? zoneSections : `<p class="print-empty">Tiada prosedur direkodkan bagi bulan ini.</p>`}</section>`;
+  return reportDocument("Laporan Bulanan Prosedur", meta, `<section class="report-kpis">${kpi("Jumlah pesakit", number.format(patients.size || rows.length))}${kpi("Jumlah prosedur", number.format(totalProcedures))}${kpi("Jenis prosedur", number.format(totals.size))}</section>${reportFolder("Perincian prosedur mengikut zon", totalProcedures, detail)}`);
 }
 
 function asthmaReport(meta) {
