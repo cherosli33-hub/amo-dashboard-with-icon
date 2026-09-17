@@ -1023,21 +1023,64 @@ function reportPreviewHtml(cases){
   const shiftLabel = state.reportShift === "all" ? "Semua syif" : `Syif ${shiftMeta(state.reportShift)?.label || state.reportShift}`;
   const procedureTotal = cases.reduce((sum,item) => sum + item.procedures.length, 0);
   const aggregates = new Map();
-  cases.forEach(item => item.procedures.forEach(proc => {
-    const name = proc.name || "Tidak dinyatakan";
-    if(!aggregates.has(name)) aggregates.set(name,{name,count:0,patients:new Set()});
-    const entry = aggregates.get(name);
-    entry.count += 1;
+  const zoneGroups = new Map(ZONES_V2.map(zone => [zone.id, {
+    ...zone,
+    procedureTotal: 0,
+    patients: new Set(),
+    procedures: new Map(),
+  }]));
+  const normalizedZoneId = value => {
+    const key = String(value || "").trim().toLowerCase().replace(/[\s-]+/g,"_");
+    const aliases = {
+      secondary: "secondary_triage",
+      secondary_triage: "secondary_triage",
+      yellow: "yellow_zone",
+      yellow_zone: "yellow_zone",
+      red: "red_zone",
+      red_zone: "red_zone",
+    };
+    return aliases[key] || key || "unassigned";
+  };
+  cases.forEach(item => {
+    const zoneId = normalizedZoneId(item.zone);
+    if(!zoneGroups.has(zoneId)) zoneGroups.set(zoneId, {
+      id: zoneId,
+      label: "Tiada Zone",
+      hex: "#8A8478",
+      procedureTotal: 0,
+      patients: new Set(),
+      procedures: new Map(),
+    });
+    const zone = zoneGroups.get(zoneId);
     const patientKey = patientKeyV2(item);
-    if(patientKey) entry.patients.add(patientKey);
-  }));
-  const rows = [...aggregates.values()]
-    .sort((a,b) => b.count-a.count || a.name.localeCompare(b.name,"ms-MY"))
-    .map(entry => `<tr><td>${esc(entry.name)}</td><td class="report-number">${entry.count}</td><td class="report-number">${entry.patients.size}</td><td class="report-number">${procedureTotal ? (entry.count/procedureTotal*100).toFixed(1) : "0.0"}%</td></tr>`).join("");
+    if(patientKey) zone.patients.add(patientKey);
+    item.procedures.forEach(proc => {
+      const name = proc.name || "Tidak dinyatakan";
+      if(!aggregates.has(name)) aggregates.set(name,{name,count:0});
+      aggregates.get(name).count += 1;
+      if(!zone.procedures.has(name)) zone.procedures.set(name,{name,count:0,patients:new Set()});
+      const entry = zone.procedures.get(name);
+      entry.count += 1;
+      if(patientKey) entry.patients.add(patientKey);
+      zone.procedureTotal += 1;
+    });
+  });
+  const zoneSections = [...zoneGroups.values()].map(zone => {
+    const rows = [...zone.procedures.values()]
+      .sort((a,b) => b.count-a.count || a.name.localeCompare(b.name,"ms-MY"))
+      .map(entry => `<tr><td>${esc(entry.name)}</td><td class="report-number">${entry.count}</td><td class="report-number">${entry.patients.size}</td><td class="report-number">${zone.procedureTotal ? (entry.count/zone.procedureTotal*100).toFixed(1) : "0.0"}%</td></tr>`).join("");
+    return `<section class="report-zone-section">
+      <header class="report-zone-header" style="--zone-color:${zone.hex}">
+        <div><i></i><strong>${esc(zone.label)}</strong></div>
+        <span><b>${zone.procedureTotal}</b> prosedur · ${zone.patients.size} pesakit</span>
+      </header>
+      ${rows ? `<div class="report-table-wrap"><table class="report-table"><thead><tr><th>Prosedur</th><th>Jumlah</th><th>Pesakit</th><th>% dalam zon</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="report-zone-empty">Tiada prosedur direkod dalam zon ini.</div>`}
+    </section>`;
+  }).join("");
   return `<section class="report-preview" id="procedure-report-print">
     <header class="report-print-header"><div><p>UNIT KECEMASAN & TRAUMA · HOSPITAL KUALA LIPIS</p><h2>Laporan Ringkasan Prosedur A.M.O</h2><span>${esc(range.label)} · ${esc(shiftLabel)}</span></div><img src="./prosedur-icon.png?v=2.6.0" alt=""></header>
     <div class="report-summary"><div><strong>${uniquePatientCountV2(cases)}</strong><span>Jumlah pesakit</span></div><div><strong>${procedureTotal}</strong><span>Jumlah prosedur</span></div><div><strong>${aggregates.size}</strong><span>Jenis prosedur</span></div></div>
-    ${rows ? `<div class="report-table-wrap"><table class="report-table"><thead><tr><th>Prosedur</th><th>Jumlah prosedur</th><th>Jumlah pesakit</th><th>Peratus</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="report-empty">Tiada rekod untuk tempoh dan syif yang dipilih.</div>`}
+    ${procedureTotal ? `<div class="report-zone-list">${zoneSections}</div>` : `<div class="report-empty">Tiada rekod untuk tempoh dan syif yang dipilih.</div>`}
     <footer class="report-print-footer">Tiada identiti pesakit dipaparkan · Dijana pada ${esc(new Date().toLocaleString("ms-MY"))}</footer>
   </section>`;
 }
@@ -1161,10 +1204,18 @@ function dailyRecordsHtml(todayCases, now){
     .report-table td{padding:7px;border-bottom:1px solid #e4e0d5;vertical-align:top}
     .report-table tbody tr:nth-child(even){background:#f8faf8}
     .report-table .report-number{text-align:right;font-family:'IBM Plex Mono',monospace}
+    .report-zone-list{display:grid;gap:14px}
+    .report-zone-section{border:1px solid #e4e0d5;border-radius:10px;overflow:hidden;break-inside:avoid}
+    .report-zone-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#f8faf8;border-bottom:1px solid #e4e0d5}
+    .report-zone-header>div{display:flex;align-items:center;gap:7px}.report-zone-header i{width:9px;height:9px;border-radius:50%;background:var(--zone-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--zone-color) 18%,transparent)}
+    .report-zone-header strong{font:700 12px 'Space Grotesk',sans-serif;color:#263b32}.report-zone-header span{color:#5c6560;font-size:9px}.report-zone-header b{font:700 12px 'IBM Plex Mono',monospace;color:#263b32}
+    .report-zone-section .report-table th:first-child,.report-zone-section .report-table td:first-child{padding-left:12px}
+    .report-zone-section .report-table th:last-child,.report-zone-section .report-table td:last-child{padding-right:12px}
+    .report-zone-empty{padding:13px;color:#8a8478;font-size:10px;text-align:center}
     .report-empty{padding:30px;border:1px dashed #d8d6cf;color:#6b7268;text-align:center}
     .report-print-footer{margin-top:12px;color:#8a8478;font-size:8px;text-align:right}
     @media(max-width:520px){.dashboard-tabs{margin-top:-4px;margin-bottom:16px}.daily-shift-heading{align-items:flex-start}.daily-shift-heading>div{flex-wrap:wrap}.daily-shift-heading small{width:100%;padding-left:16px}}
-    @media(max-width:520px){.dashboard-tab{font-size:12px}.report-filter-grid{grid-template-columns:1fr 1fr}.report-preview{padding:12px}.report-actions{align-items:flex-start;flex-direction:column}.report-table{min-width:650px}}
+    @media(max-width:520px){.dashboard-tab{font-size:12px}.report-filter-grid{grid-template-columns:1fr 1fr}.report-preview{padding:12px}.report-actions{align-items:flex-start;flex-direction:column}.report-zone-header{align-items:flex-start;flex-direction:column;gap:4px}.report-table{min-width:520px}}
     @media print{
       @page{size:A4 landscape;margin:10mm}
       body{padding:0!important;background:#fff!important;background-image:none!important}
@@ -1177,6 +1228,7 @@ function dailyRecordsHtml(todayCases, now){
       .report-table{font-size:8pt}
       .report-table thead{display:table-header-group}
       .report-table tr{break-inside:avoid}
+      .report-zone-header i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
       .report-print-footer{position:fixed;right:0;bottom:0}
     }
   `;
