@@ -62,12 +62,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Laporan Harian ETD. Satu dokumen bagi setiap Tarikh + Syif.
+    // Pengguna biasa kekal tanpa skrin login melalui Firebase Anonymous Auth.
+    // Padam dibuat sebagai soft-delete supaya rekod audit tidak hilang secara fizikal.
+    match /daily_reports/{documentId} {
+      allow read, create, update: if signedIn();
+      allow delete: if false;
+    }
+
     // Penemuan boleh dihantar oleh app biasa. Hanya restock boleh diselesaikan
     // oleh pengguna PHC; tindakan lain kekal untuk penyelia/admin.
     match /phc_findings/{documentId} {
       allow read, create: if signedIn();
-      // Pengguna PHC menyelesaikan restock sendiri. Catatan kekal hanya boleh
-      // dikemas kini oleh penyelia/admin melalui Dashboard Penerima.
       allow update: if staff()
         || (signedIn()
           && resource.data.type == 'shortage'
