@@ -1,11 +1,8 @@
-import { collection, onSnapshot, query, limit } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { db } from "../shared/firebase/core.js";
-import { COLLECTIONS } from "../shared/firebase/database.js";
-
 const TZ = "Asia/Kuala_Lumpur";
 let procedureRows = [];
 let girnRows = [];
 let frame = 0;
+let ready = [];
 
 function localParts(date = new Date()) {
   return Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
@@ -130,25 +127,16 @@ function patchHeaderShift() {
 function schedulePatch() {
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
-    patchProcedureCard();
-    patchGirnCard();
-    patchGirnShiftCards();
+    if (ready.includes("procedure")) patchProcedureCard();
+    if (ready.includes("girn")) patchGirnCard();
+    if (ready.includes("girn")) patchGirnShiftCards();
     patchHeaderShift();
   });
 }
 
-const observer = new MutationObserver(schedulePatch);
-observer.observe(document.body, { childList:true, subtree:true, characterData:true });
-
-const stopProcedure = onSnapshot(query(collection(db, COLLECTIONS.procedure), limit(5000)), snapshot => {
-  procedureRows = snapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
+window.addEventListener("amo:rendered", event => {
+  ready = event.detail.ready || [];
+  procedureRows = event.detail.procedure || [];
+  girnRows = event.detail.girn || [];
   schedulePatch();
-}, error => console.error("Gagal menyelaras kiraan syif Prosedur", error));
-
-const stopGirn = onSnapshot(query(collection(db, COLLECTIONS.girn), limit(5000)), snapshot => {
-  girnRows = snapshot.docs.map(doc => ({ id:doc.id, ...doc.data() }));
-  schedulePatch();
-}, error => console.error("Gagal menyelaras kiraan syif GIRN", error));
-
-schedulePatch();
-window.addEventListener("beforeunload", () => { observer.disconnect(); stopProcedure(); stopGirn(); });
+});

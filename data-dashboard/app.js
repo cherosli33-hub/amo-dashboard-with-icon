@@ -1,8 +1,5 @@
-import { collection, doc, limit, onSnapshot, query, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+import { collection, doc, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
 import { auth, db } from "../shared/firebase/core.js";
-import { logout, prepareAuth } from "../shared/firebase/auth.js";
-import { getProfile, isSupervisor } from "../shared/firebase/users.js";
 import { COLLECTIONS } from "../shared/firebase/database.js";
 import procedure from "./modules/procedure.js";
 import asthma from "./modules/asthma.js";
@@ -13,10 +10,12 @@ import girnFindings from "./modules/girn-findings.js";
 import supervisorAudit from "./modules/supervisor-audit.js";
 import { buildDailyComplianceSummary, buildDailyVerificationStates, latestRowsBySlot, selectAllDailyVerificationKeys } from "./modules/phc-summary.mjs";
 
+import { createDashboardDataSource } from "./data-source.js?v=1";
+
 const primaryModules = [procedure, asthma, phc, girn];
 const modules = [...primaryModules, phcFindings, girnFindings, supervisorAudit];
 const actionTaskModule = { id:"supervisor-actions", label:"Tindakan Umum", collection:COLLECTIONS.actionTasks, finding:true, filter:row => row.recordType !== "audit" };
-const streams = [...modules, actionTaskModule];
+const streams = [...primaryModules, phcFindings, girnFindings, actionTaskModule];
 const actionSources = [phcFindings, girnFindings, actionTaskModule];
 const moduleLinks = { procedure:"../amo.html", asthma:"../asthma.html", phc:"../phc-checklist/", girn:"../girn/" };
 const moduleIcons = { procedure:"PR", asthma:"AS", phc:"PH", girn:"GI" };
@@ -52,6 +51,13 @@ const supervisorFolderContent = document.querySelector("#supervisorFolderContent
 const printDialog = document.querySelector("#printDialog");
 let sessionUser = null;
 let sessionProfile = null;
+let dataSource;
+let pendingComplete = false;
+let pendingError = false;
+let renderFrame = 0;
+let reportRequest = 0;
+let reportLoading = false;
+const reportData = new Map();
 const adminEmails = new Set(["cherosli33@gmail.com", "cherosli@moh.gov.my"]);
 
 function escapeHtml(value) {
@@ -164,6 +170,12 @@ function renderHero() {
   const currentHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", hourCycle:"h23" }).format(now));
   const activeShift = currentHour >= 21 || currentHour < 7 ? "Malam" : currentHour < 14 ? "Pagi" : "Petang";
   document.querySelector("#todayContext").textContent = `${now.toLocaleDateString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", weekday:"long", day:"numeric", month:"long", year:"numeric" })} · Syif ${activeShift} · ${roleLabel()}`;
+  if (state.ready.size < streams.length) {
+    document.querySelector("#pulseCard").className = "pulse-card is-loading";
+    document.querySelector("#pulseLabel").textContent = "MENYEMAK DATA";
+    document.querySelector("#pulseDetail").textContent = "Status operasi akan dipaparkan selepas data diterima.";
+    return;
+  }
   const issues = issueCounts();
   const total = Object.values(issues).reduce((sum, list) => sum + list.length, 0);
   const critical = issues.severeAsthma.length + issues.girnIssues.filter(row => /kritikal|critical|tidak berfungsi|rosak/i.test(`${row.inspectionStatus} ${row.state} ${row.note}`)).length;
@@ -183,7 +195,7 @@ function renderModuleCards() {
     { module:phc, value:`${phcShifts.size}/3`, label:"syif direkod", note:issues.phcNotes.length ? `${issues.phcNotes.length} Tindakan Catatan` : "Tiada catatan tertunggak", tone:"green" },
     { module:girn, value:`${girnShifts.size}/3`, label:"syif diperiksa", note:issues.girnIssues.length ? `${issues.girnIssues.length} isu ditemui` : "Tiada isu tertunggak", tone:"purple" }
   ];
-  document.querySelector("#moduleCards").innerHTML = cards.map(card => `<a class="module-card ${card.tone}" href="${moduleLinks[card.module.id]}"><span class="module-icon">${moduleIcons[card.module.id]}</span><span class="module-copy"><small>${escapeHtml(card.module.label)}</small><strong>${escapeHtml(card.value)}</strong><span>${escapeHtml(card.label)}</span><em>${escapeHtml(card.note)}</em></span><b aria-hidden="true">↗</b></a>`).join("");
+  document.querySelector("#moduleCards").innerHTML = cards.map(card => `<a class="module-card ${card.tone}" href="${moduleLinks[card.module.id]}"><span class="module-icon">${moduleIcons[card.module.id]}</span><span class="module-copy"><small>${escapeHtml(card.module.label)}</small><strong>${escapeHtml(state.ready.has(card.module.id) ? card.value : "—")}</strong><span>${escapeHtml(card.label)}</span><em>${escapeHtml(state.ready.has(card.module.id) ? card.note : "Menunggu data…")}</em></span><b aria-hidden="true">↗</b></a>`).join("");
 }
 
 function attentionItems() {
@@ -198,6 +210,11 @@ function attentionItems() {
 }
 
 function renderAttention() {
+  if (state.ready.size < streams.length) {
+    document.querySelector("#attentionCount").textContent = "—";
+    document.querySelector("#attentionList").innerHTML = `<p class="empty">Menunggu data hari ini…</p>`;
+    return;
+  }
   const items = attentionItems();
   document.querySelector("#attentionCount").textContent = number.format(items.reduce((sum, item) => sum + Number(item.title.match(/\d+/)?.[0] || 0), 0));
   document.querySelector("#attentionList").innerHTML = items.length ? items.map(item => `<button class="attention-item ${item.tone}" type="button" data-attention-module="${item.module.id}"><span>${item.icon}</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></span><b>›</b></button>`).join("") : `<div class="all-clear"><span>✓</span><div><strong>Tiada tindakan diperlukan sekarang</strong><small>Semua aliran yang diterima berada dalam keadaan baik.</small></div></div>`;
@@ -258,7 +275,7 @@ function actionBadgeFor(module, row) {
 }
 
 function dailyVerificationStates(module) {
-  return buildDailyVerificationStates(rowsFor(module), rowsFor(supervisorAudit), `${module.id}-daily`, row => moduleRecordDate(module, row));
+  return buildDailyVerificationStates(rowsFor(module), [], `${module.id}-daily`, row => moduleRecordDate(module, row));
 }
 
 function dailyVerificationItems() {
@@ -268,13 +285,13 @@ function dailyVerificationItems() {
 function renderDailyVerificationModule(module, container, items) {
   const moduleItems = items.filter(item => item.module.id === module.id);
   if (!moduleItems.length) {
-    container.innerHTML = `<div class="action-empty">✓ Tiada pengesahan ${escapeHtml(module.label)} tertunggak.</div>`;
+    container.innerHTML = `<div class="action-empty">${pendingComplete ? "✓ Tiada pengesahan" : pendingError ? "Semakan gagal bagi pengesahan" : "Sedang menyemak pengesahan"} ${escapeHtml(module.label)} tertunggak.</div>`;
     return;
   }
   container.innerHTML = moduleItems.map(({ day, key }) => {
     const dateLabel = new Date(`${day.date}T12:00:00+08:00`).toLocaleDateString("ms-MY", { day:"numeric", month:"short", year:"numeric", timeZone:"Asia/Kuala_Lumpur" });
     const selected = state.selectedDailyVerifications.has(key);
-    return `<article class="daily-verification ${selected ? "selected" : ""}"><label class="daily-check"><input type="checkbox" data-daily-key="${escapeHtml(key)}" ${selected ? "checked" : ""} ${state.acting ? "disabled" : ""}><span class="sr-only">Pilih ${escapeHtml(module.label)} ${escapeHtml(dateLabel)}</span></label><div class="daily-icon" aria-hidden="true">${escapeHtml(module.label)}</div><div class="daily-copy"><small>PENGESAHAN TERTUNGGAK</small><strong>${escapeHtml(dateLabel)} · ${number.format(day.records.length)} rekod</strong><span>${number.format(day.unverified.length)} rekod belum disahkan.</span></div><button type="button" data-daily-verify="${escapeHtml(key)}" ${state.acting ? "disabled" : ""}>Sahkan</button></article>`;
+    return `<article class="daily-verification ${selected ? "selected" : ""}"><label class="daily-check"><input type="checkbox" data-daily-key="${escapeHtml(key)}" ${selected ? "checked" : ""} ${state.acting ? "disabled" : ""}><span class="sr-only">Pilih ${escapeHtml(module.label)} ${escapeHtml(dateLabel)}</span></label><div class="daily-icon" aria-hidden="true">${escapeHtml(module.label)}</div><div class="daily-copy"><small>PENGESAHAN TERTUNGGAK</small><strong>${escapeHtml(dateLabel)} · ${number.format(day.records.length)} rekod</strong><span>${number.format(day.unverified.length)} rekod belum disahkan.</span></div><button type="button" data-daily-verify="${escapeHtml(key)}" ${state.acting || !pendingComplete ? "disabled" : ""}>Sahkan</button></article>`;
   }).join("");
 }
 
@@ -291,7 +308,7 @@ function renderDailyVerifications() {
   selectAllDailyVerifications.checked = allSelected;
   selectAllDailyVerifications.indeterminate = !allSelected && selectedCount > 0;
   selectAllDailyVerifications.disabled = state.acting || items.length === 0;
-  verifySelectedDailyBtn.disabled = state.acting || selectedCount === 0;
+  verifySelectedDailyBtn.disabled = state.acting || !pendingComplete || selectedCount === 0;
   verifySelectedDailyBtn.textContent = selectedCount ? `✓ Sahkan dipilih (${number.format(selectedCount)})` : "✓ Sahkan dipilih";
 }
 
@@ -299,8 +316,8 @@ function renderActions() {
   const items = actionItems();
   const existing = new Set(items.map(item => item.key));
   [...state.selectedActions].forEach(key => { if (!existing.has(key)) state.selectedActions.delete(key); });
-  actionCount.textContent = number.format(items.length + dailyVerificationItems().length);
-  actionList.innerHTML = items.length ? items.map(({ module, row, key }) => `<label class="action-item ${state.selectedActions.has(key) ? "selected" : ""}"><span class="action-check"><input type="checkbox" data-action-key="${escapeHtml(key)}" ${state.selectedActions.has(key) ? "checked" : ""}></span><span class="action-copy"><strong>${escapeHtml(actionTitleFor(module, row))}</strong><span>${escapeHtml(actionDetailFor(module, row) || "Tiada catatan tambahan")}</span></span><span class="action-badge">${escapeHtml(actionBadgeFor(module, row))}</span></label>`).join("") : `<div class="action-empty">✓ Tiada Tindakan Catatan atau isu modul yang tertunggak.</div>`;
+  actionCount.textContent = `${number.format(items.length + dailyVerificationItems().length)}${pendingComplete ? "" : "+"}`;
+  actionList.innerHTML = items.length ? items.map(({ module, row, key }) => `<label class="action-item ${state.selectedActions.has(key) ? "selected" : ""}"><span class="action-check"><input type="checkbox" data-action-key="${escapeHtml(key)}" ${state.selectedActions.has(key) ? "checked" : ""}></span><span class="action-copy"><strong>${escapeHtml(actionTitleFor(module, row))}</strong><span>${escapeHtml(actionDetailFor(module, row) || "Tiada catatan tambahan")}</span></span><span class="action-badge">${escapeHtml(actionBadgeFor(module, row))}</span></label>`).join("") : `<div class="action-empty">${pendingComplete ? "✓ Tiada Tindakan Catatan atau isu modul yang tertunggak." : pendingError ? "Semakan rekod tertunggak gagal. Buka folder semula untuk cuba lagi." : "Sedang menyemak rekod tertunggak, termasuk rekod lama…"}</div>`;
   actionList.querySelectorAll("[data-action-key]").forEach(input => input.addEventListener("change", () => { input.checked ? state.selectedActions.add(input.dataset.actionKey) : state.selectedActions.delete(input.dataset.actionKey); renderActions(); }));
   const selectedCount = state.selectedActions.size;
   ackSelectedBtn.disabled = state.acting || selectedCount === 0;
@@ -346,7 +363,7 @@ async function runSelectedAction(mode) {
 async function verifyDailyVerifications(keys) {
   const requested = new Set(keys);
   const items = dailyVerificationItems().filter(item => requested.has(item.key));
-  if (state.acting || !items.length) return;
+  if (state.acting || !pendingComplete || !items.length) return;
   const recordCount = items.reduce((sum, item) => sum + item.day.unverified.length, 0);
   const moduleLabels = [...new Set(items.map(item => item.module.label))].join(" & ");
   if (!confirm(`Sahkan ${items.length} pengesahan harian ${moduleLabels} melibatkan ${recordCount} rekod?`)) return;
@@ -372,16 +389,18 @@ async function verifyDailyVerifications(keys) {
 function renderConnection() {
   if (state.errors.size) { connectionState.textContent = `${state.errors.size} aliran gagal disambung`; connectionState.className = "error"; }
   else if (state.ready.size < streams.length) { connectionState.textContent = `Menyambung ${state.ready.size}/${streams.length} aliran…`; connectionState.className = ""; }
-  else { connectionState.textContent = "● Semua data langsung"; connectionState.className = ""; }
+  else { connectionState.textContent = pendingComplete ? "● Semua data langsung" : pendingError ? "Data hari ini tersedia · semakan tertunggak gagal" : "Data hari ini tersedia · menyemak rekod tertunggak…"; connectionState.className = ""; }
 }
 
 function renderAll() {
   renderHero(); renderModuleCards(); renderAttention(); renderShifts(); renderRecent(); renderActions(); renderConnection();
-  lastUpdated.textContent = `Dikemas kini ${new Date().toLocaleTimeString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", minute:"2-digit", second:"2-digit" })}`;
+  window.dispatchEvent(new CustomEvent("amo:rendered", { detail:{ ...Object.fromEntries(primaryModules.map(module => [module.id, rowsFor(module)])), ready:[...state.ready] } }));
+  lastUpdated.textContent = state.ready.size < streams.length ? "Menunggu data hari ini…" : `Dikemas kini ${new Date().toLocaleTimeString("ms-MY", { timeZone:"Asia/Kuala_Lumpur", hour:"2-digit", minute:"2-digit", second:"2-digit" })}`;
 }
 
 function selectModule(module) {
   if (!primaryModules.includes(module)) return;
+  reportRequest++;
   state.active = module;
   [...tabs.children].forEach(button => button.classList.toggle("active", button.dataset.id === module.id));
   state.reportHtml = "";
@@ -393,13 +412,19 @@ function selectModule(module) {
 }
 
 function startLiveData() {
-  streams.forEach(module => {
-    const stop = onSnapshot(query(collection(db, module.collection), limit(5000)), snapshot => {
-      const rows = snapshot.docs.map(item => ({ id:item.id, ...item.data() })).filter(row => !module.filter || module.filter(row)).sort((a, b) => recordTime(b) - recordTime(a));
-      state.data.set(module.id, rows); state.ready.add(module.id); state.errors.delete(module.id); state.reportDirty = true; renderAll();
-    }, error => { console.error(`Gagal membaca ${module.collection}`, error); state.errors.add(module.id); renderConnection(); });
-    state.stops.push(stop);
+  dataSource = createDashboardDataSource({
+    streams,
+    pendingModules:[phc, girn, ...actionSources],
+    isPending:(module, row) => module.id === "phc" || module.id === "girn" ? row.verified !== true : isOutstanding(module, row),
+    onRows(module, rows, ready) {
+      state.data.set(module.id, rows); if (ready) state.ready.add(module.id); state.errors.delete(module.id); state.reportDirty = true;
+      cancelAnimationFrame(renderFrame); renderFrame = requestAnimationFrame(renderAll);
+    },
+    onError(module, error) { console.error(`Gagal membaca ${module.collection}`, error); state.errors.add(module.id); renderConnection(); },
+    onPendingState(complete, error) { pendingComplete = complete; pendingError = Boolean(error); renderActions(); renderConnection(); }
   });
+  state.stops.push(() => dataSource.stop());
+  dataSource.start();
 }
 
 function selectedMonthMeta() {
@@ -413,7 +438,7 @@ function selectedMonthMeta() {
 
 function monthlyRows(module) {
   const prefix = selectedMonthMeta().value;
-  return rowsFor(module).filter(row => moduleRecordDate(module, row).startsWith(prefix));
+  return (reportData.get(module.id) || []).filter(row => moduleRecordDate(module, row).startsWith(prefix));
 }
 
 function kpi(label, value, note = "", tone = "") {
@@ -543,7 +568,7 @@ function findingModuleFor(module) {
 
 function monthlyFindingsFor(module, meta) {
   const findingModule = findingModuleFor(module);
-  return rowsFor(findingModule).filter(row => recordDate(row).startsWith(meta.value)).sort((a, b) => recordTime(a) - recordTime(b));
+  return (reportData.get(findingModule.id) || []).filter(row => recordDate(row).startsWith(meta.value)).sort((a, b) => recordTime(a) - recordTime(b));
 }
 
 function findingStatusLabel(row) {
@@ -615,8 +640,20 @@ function girnReport(meta) {
   return dailyChecklistReport(girn, "Laporan Bulanan GIRN", meta);
 }
 
-function generateMonthlyReport() {
+async function generateMonthlyReport() {
+  if (reportLoading || !dataSource) return null;
   const meta = selectedMonthMeta();
+  const selectedModule = state.active;
+  const request = ++reportRequest;
+  reportLoading = true; generateReportBtn.disabled = true; printPreviewBtn.disabled = true;
+  status.textContent = `Memuatkan rekod ${selectedModule.label} untuk ${meta.label}…`;
+  try {
+    const targets = [selectedModule];
+    if (selectedModule.id === "phc") targets.push(phcFindings);
+    if (selectedModule.id === "girn") targets.push(girnFindings);
+    const loaded = await Promise.all(targets.map(async module => [module.id, await dataSource.month(module, meta.value)]));
+    if (request !== reportRequest || state.active !== selectedModule || selectedMonthMeta().value !== meta.value) return null;
+    loaded.forEach(([id, rows]) => reportData.set(id, rows));
   state.reportMonth = meta.value;
   state.reportHtml = state.active.id === "procedure" ? procedureReport(meta) : state.active.id === "asthma" ? asthmaReport(meta) : state.active.id === "phc" ? phcReport(meta) : girnReport(meta);
   state.reportDirty = false;
@@ -624,10 +661,12 @@ function generateMonthlyReport() {
   status.textContent = `Laporan ${state.active.label} · ${meta.label} siap dijana.`;
   printPreviewBtn.disabled = false;
   return state.reportHtml;
+  } catch (error) { status.textContent = `Laporan tidak dapat dimuatkan. Cuba lagi. ${error.message || ""}`; return null; }
+  finally { reportLoading = false; generateReportBtn.disabled = false; }
 }
 
-function openPrintPreview() {
-  if (state.reportDirty || !state.reportHtml || state.reportMonth !== selectedMonthMeta().value) generateMonthlyReport();
+async function openPrintPreview() {
+  if (state.reportDirty || !state.reportHtml || state.reportMonth !== selectedMonthMeta().value) { if (!await generateMonthlyReport()) return; }
   document.querySelector("#printReport").innerHTML = state.reportHtml;
   document.querySelectorAll("#printReport .report-folder").forEach(folder => { folder.open = true; });
   document.querySelector("#previewHint").textContent = `${state.active.label} · ${selectedMonthMeta().label}`;
@@ -646,6 +685,7 @@ primaryModules.forEach(module => {
 });
 reportMonth.value = localDateKey().slice(0, 7);
 reportMonth.addEventListener("change", () => {
+  reportRequest++;
   state.reportDirty = true;
   state.reportHtml = "";
   reportPreview.innerHTML = `<p class="empty">Bulan ditukar. Tekan <strong>Jana laporan bulanan</strong>.</p>`;
@@ -658,11 +698,11 @@ document.querySelector("#closePreviewBtn").addEventListener("click", closePrintP
 document.querySelector("#printBtn").addEventListener("click", printReport);
 printDialog.addEventListener("cancel", event => { event.preventDefault(); closePrintPreview(); });
 window.addEventListener("afterprint", () => document.body.classList.remove("printing"));
-document.querySelector("#logoutBtn").addEventListener("click", async () => { state.stops.forEach(stop => stop()); await logout(); location.href = "../"; });
 selectAllActions.addEventListener("change", () => { const items = actionItems(); selectAllActions.checked ? items.forEach(item => state.selectedActions.add(item.key)) : state.selectedActions.clear(); renderActions(); });
 selectAllDailyVerifications.addEventListener("change", () => { state.selectedDailyVerifications = selectAllDailyVerificationKeys(dailyVerificationItems(), selectAllDailyVerifications.checked); renderActions(); });
 supervisorFolderToggle.addEventListener("click", () => {
   const opening = supervisorFolderContent.hidden;
+  if (opening) void dataSource?.refreshPending();
   supervisorFolderContent.hidden = !opening;
   supervisorFolderToggle.setAttribute("aria-expanded", String(opening));
   supervisorFolderToggle.querySelector(".folder-label").textContent = opening ? "Tutup" : "Buka";
@@ -672,16 +712,15 @@ ackSelectedBtn.addEventListener("click", () => runSelectedAction("acknowledge"))
 verifySelectedBtn.addEventListener("click", () => runSelectedAction("verify"));
 window.addEventListener("beforeunload", () => state.stops.forEach(stop => stop()));
 
-await prepareAuth();
-const user = await new Promise(resolve => { const stop = onAuthStateChanged(auth, value => { stop(); resolve(value); }); });
-const profile = user && !user.isAnonymous ? await getProfile(user.uid).catch(() => null) : null;
-if (!user || user.isAnonymous || !isSupervisor(profile)) {
-  gate.innerHTML = `<h2>Akses tidak dibenarkan</h2><p>Log masuk di dashboard utama menggunakan akaun admin atau penyelia yang diluluskan.</p><a href="../">Kembali ke dashboard utama</a>`;
-} else {
+export function mountDashboard(user, profile) {
+  state.data.clear(); state.ready.clear(); state.errors.clear(); state.stops = [];
+  state.selectedActions.clear(); state.selectedDailyVerifications.clear();
+  pendingComplete = false; pendingError = false;
   sessionUser = user; sessionProfile = profile;
   document.querySelector("#userLabel").textContent = `${profile.name || user.displayName || user.email} · ${roleLabel()}`;
   document.querySelector("#supervisorCentre").hidden = false;
   gate.hidden = true; dashboard.hidden = false;
   [...tabs.children].find(button => button.dataset.id === state.active.id)?.classList.add("active");
   renderAll(); startLiveData();
+  return () => { state.stops.forEach(stop => stop()); dashboard.hidden = true; cancelAnimationFrame(renderFrame); };
 }

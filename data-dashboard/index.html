@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b5f58">
   <title>Dashboard Penerima · AMO Dashboard v2</title>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <link rel="stylesheet" href="./styles.css?v=11">
 </head>
 <body>
@@ -134,9 +136,16 @@
     </div>
   </dialog>
 
-  <script type="module" src="./app.js?v=12"></script>
-  <script type="module" src="./findings-report-enhancement.js?v=1"></script>
-  <script type="module" src="./procedure-shift-enhancement.js?v=1"></script>
-  <script type="module" src="./activity-enhancement.js?v=1"></script>
+  <script>
+    window.amoAccessTimer = setTimeout(() => {
+      const gate = document.querySelector("#gate");
+      if (!gate.hidden) {
+        gate.querySelector("p").textContent = "Sambungan mengambil masa lebih lama. Tunggu sebentar atau cuba semula.";
+        const retry = document.createElement("button");
+        retry.textContent = "Cuba semula"; retry.onclick = () => location.reload(); gate.append(retry);
+      }
+    }, 10000);
+  </script>
+  <script type="module" src="./bootstrap.js?v=1"></script>
 </body>
 </html>

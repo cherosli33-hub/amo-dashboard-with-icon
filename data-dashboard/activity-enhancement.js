@@ -1,18 +1,7 @@
-import { collection, limit, onSnapshot, query } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
-import { db } from "../shared/firebase/core.js";
-import { COLLECTIONS } from "../shared/firebase/database.js";
-
 const TZ = "Asia/Kuala_Lumpur";
 const moduleLinks = { procedure:"../amo.html", asthma:"../asthma.html", phc:"../phc-checklist/", girn:"../girn/" };
 const moduleLabels = { procedure:"Prosedur", asthma:"Asthma", phc:"PHC", girn:"GIRN" };
-const moduleCollections = {
-  procedure:COLLECTIONS.procedure,
-  asthma:COLLECTIONS.asthma,
-  phc:COLLECTIONS.phc,
-  girn:COLLECTIONS.girn
-};
 const rowsByModule = new Map();
-const stops = [];
 let frame = 0;
 let isOpen = false;
 
@@ -138,16 +127,8 @@ function scheduleRender() {
   });
 }
 
-Object.entries(moduleCollections).forEach(([moduleId, collectionName]) => {
-  if (!collectionName) return;
-  const stop = onSnapshot(query(collection(db, collectionName), limit(5000)), snapshot => {
-    rowsByModule.set(moduleId, snapshot.docs.map(doc => ({ id:doc.id, ...doc.data() })));
-    scheduleRender();
-  }, error => console.error(`Gagal menyelaras aktiviti ${moduleId}`, error));
-  stops.push(stop);
+window.addEventListener("amo:rendered", event => {
+  Object.entries(event.detail).filter(([id]) => id !== "ready").forEach(([id, rows]) => rowsByModule.set(id, rows));
+  scheduleRender();
 });
-
-const observer = new MutationObserver(scheduleRender);
-observer.observe(document.body, { childList:true, subtree:true });
 scheduleRender();
-window.addEventListener("beforeunload", () => { observer.disconnect(); stops.forEach(stop => stop()); });
