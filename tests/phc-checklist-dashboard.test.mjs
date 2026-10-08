@@ -86,3 +86,31 @@ test("local operational-week clock changes listener range without a cloud refres
   [...h.timers.values()].find(timer=>timer.delay===1000).fn();
   assert.equal(old.stopped,true);assert.equal(h.subscription.from,"2026-10-12");assert.equal(h.subscription.to,"2026-10-18");h.events.get("pagehide")();
 });
+test("latest complete stock excludes historical shortages but retains current shortages",()=>{
+  const h=harness();h.start();
+  const latest={...h.fixture,id:"afternoon",shift:"Petang",savedAt:"2026-10-08T15:00:00+08:00",quantities:{airway:{items:[{name:"Old item",qty:2,standard:2},{name:"Current item",qty:0,standard:1}]}}};
+  const finding=(id,item,inspectionId)=>({id,inspectionId,date:"2026-10-08",type:"shortage",item,qty:0,standard:2,bagShift:"PHC 1 / Pagi",status:"Belum diambil tindakan"});
+  h.subscription.next({records:[h.fixture,latest],findings:[finding("old","Old item","inspection"),finding("current","Current item","afternoon")]});
+  assert.match(h.html(),/Restock<\/strong><small>1 item/);
+  h.element("#restockButton").handlers.click();assert.doesNotMatch(h.modal().innerHTML,/<strong>Old item/);assert.match(h.modal().innerHTML,/<strong>Current item/);
+  assert.equal(h.context.loadFindings().length,2);h.events.get("pagehide")();
+});
+test("one-item restock resolves all duplicate findings for that bag only",async()=>{
+  const h=harness();h.start();
+  const finding=(id,inspectionId,bag)=>({id,inspectionId,date:"2026-10-08",type:"shortage",item:"Test item",qty:0,standard:2,bagShift:`${bag} / Pagi`,status:"Belum diambil tindakan"});
+  h.subscription.next({records:[h.fixture,{...h.fixture,id:"second",bag:"PHC 2"}],findings:[finding("a","inspection","PHC 1"),finding("b","older","PHC 1"),finding("c","second","PHC 2")]});
+  const button={dataset:{restockKey:"inspection|Test item",restockFinding:"a"}};
+  await h.modal().handlers.click({target:{closest:selector=>selector===".restock-one"?button:null}});
+  const actions=h.context.loadRestockActions();
+  assert.equal(actions["inspection|Test item"].syncStatus,"SYNCED");assert.equal(actions["older|Test item"].syncStatus,"SYNCED");assert.equal(actions["second|Test item"],undefined);
+  assert.equal(h.context.loadLatestInventory()["PHC 2"].quantities.airway.items[0].qty,0);
+  assert.match(h.html(),/Restock<\/strong><small>1 item/);h.events.get("pagehide")();
+});
+test("pending restock displays a visible sync message and stays queued",async()=>{
+  const h=harness();h.start();h.context.navigator.onLine=false;
+  h.subscription.next({records:[h.fixture],findings:[{id:"shortage",inspectionId:"inspection",date:"2026-10-08",type:"shortage",item:"Test item",qty:0,standard:2,bagShift:"PHC 1 / Pagi",status:"Belum diambil tindakan"}]});
+  const button={dataset:{restockKey:"inspection|Test item",restockFinding:"shortage"}};
+  await h.modal().handlers.click({target:{closest:selector=>selector===".restock-one"?button:null}});
+  assert.match(h.html(),/connection-banner pending/);assert.match(h.html(),/BELUM masuk Firebase/);
+  assert.equal(h.context.loadRestockActions()["inspection|Test item"].syncStatus,"PENDING");h.events.get("pagehide")();
+});

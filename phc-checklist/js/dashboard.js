@@ -53,25 +53,43 @@ function shortageFinding(record,item){
 }
 
 function currentLowItems(){
-  // Sheet ialah sumber utama: findingId sentiasa ID sebenar dari PENEMUAN,
-  // dan SEMUA shift yang belum diambil tindakan disenaraikan (bukan shift terbaru sahaja).
   const actions=loadRestockActions();
+  const latest=loadLatestInventory();
   const latestByItem=new Map();
-  findings
-    .filter(finding=>finding.type==="shortage"&&finding.status==="Belum diambil tindakan")
-    .forEach(finding=>{
-      const parts=String(finding.bagShift||"").split(" / ");
-      const item={name:finding.item,qty:finding.qty,standard:finding.standard,
-        bag:parts[0]||"",shift:parts[1]||"",date:finding.date,recordId:finding.inspectionId,
-        findingId:finding.id,findingStatus:finding.status,
-        key:`${finding.inspectionId}|${finding.item}`};
-      const dedupeKey=`${item.bag}|${item.name}`;
-      const current=latestByItem.get(dedupeKey);
-      if(!current||String(item.date||"")>=String(current.date||"")) latestByItem.set(dedupeKey,item);
-    });
-  return [...latestByItem.values()]
-    // hanya sembunyi jika tindakan BENAR-BENAR sudah sampai ke Firebase
-    .filter(item=>actions[item.key]?.syncStatus!=="SYNCED");
+  for(const finding of findings){
+    if(finding.type!=="shortage"||finding.status!=="Belum diambil tindakan") continue;
+    const [bag="",shift=""]=String(finding.bagShift||"").split(" / ");
+    const inventory=latest[bag];
+    const checked=Object.values(inventory?.quantities||{}).flatMap(group=>group.items||[]).find(item=>item.name===finding.item);
+    // A newer checklist is the current stock, while old findings remain in the audit history.
+    const source=records.find(record=>record.id===finding.inspectionId);
+    const findingTime=source?recordTimestamp(source):new Date(`${finding.date}T00:00`).getTime();
+    if(checked&&inventory.id!==finding.inspectionId&&recordTimestamp(inventory)>findingTime&&Number(checked.qty)>=Number(checked.standard)) continue;
+    const key=`${finding.inspectionId}|${finding.item}`;
+    const synced=Object.values(actions).some(action=>action.findingId===finding.id&&action.syncStatus==="SYNCED");
+    if(actions[key]?.syncStatus==="SYNCED"||synced) continue;
+    const dedupeKey=`${bag}|${finding.item}`;
+    const resolution={key,findingId:finding.id};
+    const current=latestByItem.get(dedupeKey);
+    if(current){ current.resolutions.push(resolution); continue; }
+    latestByItem.set(dedupeKey,{name:finding.item,qty:checked?.qty??finding.qty,standard:checked?.standard??finding.standard,
+      bag,shift,date:finding.date,recordId:finding.inspectionId,findingId:finding.id,key,resolutions:[resolution]});
+  }
+  return [...latestByItem.values()];
+}
+
+function queueRestock(items){
+  const latest=loadLatestInventory(); const stamp=new Date().toISOString();
+  for(const item of items){
+    for(const resolution of item.resolutions) saveRestockAction(resolution.key,"Semua stok telah ditambah",{findingId:resolution.findingId,syncStatus:"PENDING"});
+    const record=latest[item.bag];
+    if(!record) continue;
+    const copy=structuredClone(record);
+    Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(stock=>{
+      if(stock.name===item.name&&Number(stock.qty)<Number(stock.standard)) stock.qty=stock.standard;
+    }));
+    copy.savedAt=stamp; saveLatestInventory(copy); latest[item.bag]=copy;
+  }
 }
 
 function render(){
@@ -85,6 +103,7 @@ function render(){
   const pendingNotes=findings.filter(finding=>finding.type!=="shortage"&&finding.note&&finding.status==="Belum diambil tindakan"&&!actions[noteActionKey(finding)]);
   const bagCard=bag=>`<article class="card bag-card"><div class="bag-title"><span class="bag-badge">\u25a3</span><h3>Beg ${bag}</h3></div><div class="shift-list">${SHIFTS.map(shift=>`<div class="shift-row"><span>${shift}</span>${statusIcon(completed.has(`${bag}-${shift}`))}</div>`).join("")}</div></article>`;
   content.innerHTML=`
+    ${hasPending()||connectionMessage?`<div class="connection-banner ${hasPending()?"pending":"info"}"><strong>${hasPending()?"Menunggu sync":"Status sambungan"}</strong><span>${esc(connectionMessage||"Tindakan disimpan pada peranti dan menunggu Firebase.")}</span></div>`:""}
     <section class="date-line"><div><p class="eyebrow">HARI INI</p><h1>${formatDate(now,{weekday:"long",day:"numeric",month:"long"})}</h1></div><span class="live-time" id="liveTime"></span></section>
     <section class="card next-card"><span class="label">TINDAKAN SETERUSNYA</span>${next?`<h2>${next.replace("-"," \u00b7 Shift ")}</h2><p>Pemeriksaan ini masih belum dilengkapkan.</p>`:`<h2>Semua pemeriksaan lengkap</h2><p>Semua beg dan shift sudah disemak hari ini.</p>`}</section>
     <section class="card status-summary"><div class="section-head"><h2>Status Hari Ini</h2><span class="state-dot ${completed.size===6?"done":"pending"}">${completed.size===6?"\u2713":"!"}</span></div><div class="progress-row"><div class="progress-ring" style="--progress:${Math.round(completed.size/6*100)}%"><strong>${completed.size}/6</strong></div><div class="progress-copy"><strong>${completed.size} pemeriksaan selesai</strong><small>2 beg \u00d7 3 shift setiap hari</small></div></div></section>
@@ -154,16 +173,14 @@ restockModal.addEventListener("click",async event=>{
     if(!confirm("Item ini telah ditambah ke dalam beg?")) return;
     oneButton.disabled=true; oneButton.textContent="Menyimpan...";
     const key=oneButton.dataset.restockKey; const findingId=oneButton.dataset.restockFinding;
-    saveRestockAction(key,"Semua stok telah ditambah",{findingId,syncStatus:"PENDING"});
-    // Naikkan qty item ini sahaja dalam inventori tempatan
-    const stampOne=new Date().toISOString();
-    const latestOne=loadLatestInventory();
-    Object.values(latestOne).forEach(record=>{ const copy=structuredClone(record); let ubah=false; Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(item=>{ if(`${record.id}|${item.name}`===key && item.qty<item.standard){ item.qty=item.standard; ubah=true; } })); if(ubah){ copy.savedAt=stampOne; saveLatestInventory(copy); } });
+    const selected=currentLowItems().find(item=>item.findingId===findingId&&item.key===key);
+    if(!selected){ oneButton.disabled=false; render(); return; }
+    queueRestock([selected]);
     restockModal.hidden=true; connectionMessage="Item ditanda. Menghantar tindakan ke Firebase..."; render();
     const resOne=await syncPendingRestockActions().catch(()=>({synced:0,pending:1}));
     live.requestSync(5000);
     connectionMessage=resOne.pending
-      ? `Item dikemas kini pada telefon. Tindakan BELUM masuk Sheet${resOne.lastError?` (${resOne.lastError})`:""}. Cuba semula automatik.`
+      ? `Item dikemas kini pada telefon. Tindakan BELUM masuk Firebase${resOne.lastError?` (${resOne.lastError})`:""}. Cuba semula automatik.`
       : `Item direkodkan dalam Firebase sebagai Telah diambil tindakan.`;
     render();
     return;
@@ -171,15 +188,13 @@ restockModal.addEventListener("click",async event=>{
   const button=event.target.closest("#completeAllRestock"); if(!button) return;
   if(!confirm("Semua item yang disenaraikan telah ditambah ke dalam beg?")) return;
   button.disabled=true; button.textContent="Menyimpan...";
-  const latest=loadLatestInventory(); const stamp=new Date().toISOString();
-  const activeItems=currentLowItems().map(item=>({key:item.key,findingId:item.findingId}));
-  activeItems.forEach(({key,findingId})=>saveRestockAction(key,"Semua stok telah ditambah",{findingId,syncStatus:"PENDING"}));
-  Object.values(latest).forEach(record=>{ const copy=structuredClone(record); Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(item=>{ if(item.qty<item.standard) item.qty=item.standard; })); copy.savedAt=stamp; saveLatestInventory(copy); });
+  const activeItems=currentLowItems();
+  queueRestock(activeItems);
   restockModal.hidden=true; connectionMessage="Stok dikemas kini. Menghantar tindakan ke Firebase..."; render();
   const result=await syncPendingRestockActions().catch(()=>({synced:0,pending:activeItems.length}));
   live.requestSync(5000);
   connectionMessage=result.pending
-    ? `Stok dikemas kini pada telefon. ${result.pending} tindakan BELUM masuk Sheet${result.lastError?` (${result.lastError})`:""}. Cuba semula automatik.`
+    ? `Stok dikemas kini pada telefon. ${result.pending} tindakan BELUM masuk Firebase${result.lastError?` (${result.lastError})`:""}. Cuba semula automatik.`
     : `${result.synced} tindakan direkodkan dalam Firebase sebagai Telah diambil tindakan.`;
   render();
 });
