@@ -73,7 +73,7 @@ function currentLowItems(){
     const current=latestByItem.get(dedupeKey);
     if(current){ current.resolutions.push(resolution); continue; }
     latestByItem.set(dedupeKey,{name:finding.item,qty:checked?.qty??finding.qty,standard:checked?.standard??finding.standard,
-      bag,shift,date:finding.date,recordId:finding.inspectionId,findingId:finding.id,key,resolutions:[resolution]});
+      bag,shift:checked?inventory.shift:shift,date:checked?inventory.date:finding.date,recordId:finding.inspectionId,findingId:finding.id,key,resolutions:[resolution]});
   }
   return [...latestByItem.values()];
 }
