@@ -24,6 +24,13 @@ async function request(url, options={}){
 
 export function apiConfigured(){ return configured(); }
 
+export function subscribeDashboard(from,to,next,error){
+    if(typeof window.AMOSubscribePhcDashboard!=="function"){
+          throw new Error("Firebase listener belum tersedia.");
+    }
+    return window.AMOSubscribePhcDashboard(from,to,next,error);
+}
+
 export async function supervisorSession(idToken){
     if(!configured()) throw new Error("Firebase belum disambungkan.");
     return request(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"supervisorSession",idToken})});

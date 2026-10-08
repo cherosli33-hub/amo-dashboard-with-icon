@@ -1,5 +1,6 @@
 import { SHIFTS, formatDate, getWeekDays, isoDate, loadFindings, loadLatestInventory, loadPendingSync, loadRecords, loadRestockActions, operationalDate, operationalDateKey, reconcileRemoteRecords, recordLowItems, saveFindings, saveLatestInventory, savePendingSync, saveRestockAction } from "./app.js";
-import { apiConfigured, fetchDashboard, syncPendingInspections, syncPendingRestockActions } from "./api.js";
+import { apiConfigured, subscribeDashboard, syncPendingInspections, syncPendingRestockActions } from "./api.js";
+import { createDashboardLive } from "./dashboard-live.mjs";
 
 const content=document.querySelector("#dashboardContent");
 const restockModal=document.querySelector("#restockModal");
@@ -107,34 +108,29 @@ function showNoteActions(notes){
 }
 function updateClock(){ const el=document.querySelector("#liveTime"); if(el) el.textContent=new Intl.DateTimeFormat("ms-MY",{hour:"2-digit",minute:"2-digit",hour12:true}).format(new Date()); }
 
-let refreshPromise=null;
-function refresh(){
-  if(refreshPromise) return refreshPromise;
-  refreshPromise=runRefresh().finally(()=>{ refreshPromise=null; });
-  return refreshPromise;
+function hasPending(){
+  return loadPendingSync().length>0||Object.values(loadRestockActions()).some(action=>action.syncStatus!=="SYNCED"&&action.findingId);
 }
-
-async function runRefresh(){
-  refreshDateWindow();
-  if(!apiConfigured()){ connectionMessage="Firebase belum disambungkan."; render(); return; }
-  const inspectionSync=syncPendingInspections().catch(()=>({synced:0})); syncPendingRestockActions().catch(()=>{});
-  const from=isoDate(weekDays[0]); const to=isoDate(weekDays[6]);
-  const dashboardResult=await fetchDashboard(from,to).then(value=>({ok:true,value})).catch(error=>({ok:false,error}));
-  if(dashboardResult.ok){
-    reconcileConfirmedPending(dashboardResult.value.records,dashboardResult.value.findings);
-    dashboardResult.value.records.forEach(record=>{ if(record.quantities) saveLatestInventory(record); });
-    records=reconcileRemoteRecords(dashboardResult.value.records,from,to);
+const live=createDashboardLive({
+  subscribe:subscribeDashboard,
+  getRange:()=>({from:isoDate(weekDays[0]),to:isoDate(weekDays[6])}),
+  isOnline:()=>navigator.onLine,
+  hasPending,
+  sync:async()=>{
+    await Promise.all([syncPendingInspections(),syncPendingRestockActions()]);
+    records=loadRecords(); findings=loadFindings(); render();
+  },
+  onData:(data,{from,to})=>{
+    reconcileConfirmedPending(data.records,data.findings);
+    data.records.forEach(record=>{ if(record.quantities) saveLatestInventory(record); });
+    records=reconcileRemoteRecords(data.records,from,to);
+    findings=mergeFindings(data.findings,records.filter(record=>record.date>=from&&record.date<=to),true);
+    saveFindings(findings); connectionMessage=""; render();
+  },
+  onError:()=>{
+    connectionMessage="Paparan menggunakan rekod peranti. Sambungan akan dicuba semula."; render();
   }
-  const sourceRecords=records.filter(record=>record.date>=from&&record.date<=to);
-  findings=dashboardResult.ok
-    ? mergeFindings(dashboardResult.value.findings,sourceRecords,true)
-    : mergeFindings([],sourceRecords,false);
-  saveFindings(findings);
-  connectionMessage=dashboardResult.ok?"":"Paparan menggunakan rekod peranti. Sambungan akan dicuba semula.";
-  render();
-  const syncResult=await inspectionSync;
-  if(syncResult.synced) setTimeout(refresh,0);
-}
+});
 
 restockModal.addEventListener("click",async event=>{
   if(event.target===restockModal||event.target.closest(".modal-close")){ restockModal.hidden=true; return; }
@@ -150,7 +146,7 @@ restockModal.addEventListener("click",async event=>{
     syncPendingRestockActions().then(result=>{
       connectionMessage=result.pending?"Status disimpan pada telefon dan akan dihantar semula.":`Catatan ditanda: ${status}.`;
       render();
-    }).catch(()=>{ connectionMessage="Status disimpan pada telefon dan akan dihantar semula."; render(); });
+    }).catch(()=>{ connectionMessage="Status disimpan pada telefon dan akan dihantar semula."; render(); }).finally(()=>live.requestSync(5000));
     return;
   }
   const oneButton=event.target.closest(".restock-one");
@@ -165,6 +161,7 @@ restockModal.addEventListener("click",async event=>{
     Object.values(latestOne).forEach(record=>{ const copy=structuredClone(record); let ubah=false; Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(item=>{ if(`${record.id}|${item.name}`===key && item.qty<item.standard){ item.qty=item.standard; ubah=true; } })); if(ubah){ copy.savedAt=stampOne; saveLatestInventory(copy); } });
     restockModal.hidden=true; connectionMessage="Item ditanda. Menghantar tindakan ke Firebase..."; render();
     const resOne=await syncPendingRestockActions().catch(()=>({synced:0,pending:1}));
+    live.requestSync(5000);
     connectionMessage=resOne.pending
       ? `Item dikemas kini pada telefon. Tindakan BELUM masuk Sheet${resOne.lastError?` (${resOne.lastError})`:""}. Cuba semula automatik.`
       : `Item direkodkan dalam Firebase sebagai Telah diambil tindakan.`;
@@ -180,17 +177,26 @@ restockModal.addEventListener("click",async event=>{
   Object.values(latest).forEach(record=>{ const copy=structuredClone(record); Object.values(copy.quantities||{}).forEach(group=>(group.items||[]).forEach(item=>{ if(item.qty<item.standard) item.qty=item.standard; })); copy.savedAt=stamp; saveLatestInventory(copy); });
   restockModal.hidden=true; connectionMessage="Stok dikemas kini. Menghantar tindakan ke Firebase..."; render();
   const result=await syncPendingRestockActions().catch(()=>({synced:0,pending:activeItems.length}));
+  live.requestSync(5000);
   connectionMessage=result.pending
     ? `Stok dikemas kini pada telefon. ${result.pending} tindakan BELUM masuk Sheet${result.lastError?` (${result.lastError})`:""}. Cuba semula automatik.`
     : `${result.synced} tindakan direkodkan dalam Firebase sebagai Telah diambil tindakan.`;
   render();
 });
-function resumeRefresh(){ refreshDateWindow(); render(); refresh(); }
+function resumeRefresh(){
+  refreshDateWindow(); render();
+  if(!apiConfigured()){ connectionMessage="Firebase belum disambungkan."; render(); return; }
+  live.resume();
+}
 window.addEventListener("online",resumeRefresh);
 window.addEventListener("focus",resumeRefresh);
 window.addEventListener("pageshow",resumeRefresh);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") resumeRefresh(); });
 render();
-setInterval(updateClock,30000);
-setInterval(()=>{ if(document.visibilityState==="visible") refresh(); },5000);
-refresh();
+const clockTimer=setInterval(()=>{
+  if(refreshDateWindow()){ render(); live.resume(); }
+  else updateClock();
+},1000);
+window.addEventListener("pagehide",()=>{ live.stop(); });
+window.addEventListener("beforeunload",()=>{ clearInterval(clockTimer); live.stop(); });
+resumeRefresh();

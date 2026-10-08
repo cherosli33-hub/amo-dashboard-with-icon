@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { dateWindow, monthWindow, mergeRows, readPages, withTimeout } from "../data-dashboard/loading.mjs";
 import { buildDailyVerificationStates } from "../data-dashboard/modules/phc-summary.mjs";
 
-const body = (await readFile(new URL("../data-dashboard/data-source.js", import.meta.url), "utf8")).replace(/^import .*;\n/gm, "").replace("export function", "function");
+const body = (await readFile(new URL("../data-dashboard/data-source.js", import.meta.url), "utf8")).replace(/^import .*;\r?\n/gm, "").replace("export function", "function");
 function harness(records = []) {
   const listeners = [], reads = [], states = [], emitted = new Map();
   let fail = false;

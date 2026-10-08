@@ -14,6 +14,14 @@
     }).catch(error => onError?.(error));
     return () => { cancelled = true; stop?.(); };
   };
+  window.AMOSubscribePhcDashboard = function (from, to, callback, onError) {
+    let stop = null;
+    let cancelled = false;
+    import(adapterUrl).then(module => {
+      if (!cancelled) stop = module.subscribePhcDashboard(from, to, callback, onError);
+    }).catch(error => { if (!cancelled) onError?.(error); });
+    return () => { cancelled = true; stop?.(); };
+  };
   window.fetch = function (input, init) {
     const raw = typeof input === "string" ? input : input?.url || "";
     let hostname = "";

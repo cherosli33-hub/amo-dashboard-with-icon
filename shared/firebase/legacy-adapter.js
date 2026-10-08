@@ -5,6 +5,7 @@ import { auth, db } from "./core.js";
 import { ensureAppSession } from "./auth.js";
 import { COLLECTIONS } from "./database.js";
 import { getProfile, isSupervisor } from "./users.js";
+import { subscribeDashboard } from "./phc-dashboard-source.mjs";
 
 const ENDPOINTS = Object.freeze({
   procedure: "firebase-v2-procedure",
@@ -194,7 +195,7 @@ async function phcRequest(action, params, body) {
   if (action === "records" || action === "dashboard" || action === "latestInventory") {
     let records = action === "latestInventory"
       ? await listMatching(COLLECTIONS.phc, orderBy("savedAt", "desc"), limit(100))
-      : (await list(COLLECTIONS.phc)).filter(item => inRange(item, params.from, params.to));
+      : await listMatching(COLLECTIONS.phc, where("date", ">=", params.from || "2000-01-01"), where("date", "<=", params.to || "2100-12-31"));
     if (action === "latestInventory") {
       const latest = {};
       records.forEach(record => { if (!latest[record.bag] || String(record.savedAt) > String(latest[record.bag].savedAt)) latest[record.bag] = record; });
@@ -338,6 +339,18 @@ export function subscribeModule(moduleName, callback, onError) {
     }, onError);
   }).catch(onError);
   return () => stop();
+}
+
+export function subscribePhcDashboard(from, to, callback, onError) {
+  return subscribeDashboard({
+    ensureSession:ensureAppSession, from, to, next:callback, error:onError,
+    listen:(name, filters, next, error) => onSnapshot(
+      query(collection(db, name), ...filters.map(args => where(...args))),
+      { includeMetadataChanges:true },
+      snapshot => next(snapshot.docs.map(item => ({ id:item.id, ...plain(item.data()) })), snapshot.metadata),
+      error
+    )
+  });
 }
 
 export async function firebaseFetch(input, init = {}) {
